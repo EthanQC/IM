@@ -4,6 +4,156 @@
    + 前端：Vue3、Vue Router、Vuex、WebSocket、Element - UI 等。
    + 后端：Go、Gin、GORM、GoRedis、WebSocket、Kafka、WebRTC、Zap 日志库等。
 
+# 项目结构
+
+## 后端
+
+```
+kama-chat-server/
+├── api/
+│   └── v1/
+│       └── chatroom_controller.go
+│       └── controller.go
+│       └── group_info_controller.go
+│       └── message_controller.go
+│       └── session_controller.go
+│       └── user_contact_controller.go
+│       └── user_info_controller.go
+│       └── ws_controller.go
+├── cmd/
+│   └── kama-chat-server/
+│       └── main.go
+├── internal/
+│   ├── config/
+│   │   └── config.go
+│   ├── dao/
+│   │   └── gorm.go
+│   ├── dto/
+│   │   ├── request/
+│   │   │   └── ......
+│   │   └── respond/
+│   │   │   └── ......
+│   ├── https_server/
+│   │   └── https_server.go
+│   ├── model/
+│   │   ├── contact_apply.go
+│   │   ├── group_info.go
+│   │   ├── message.go
+│   │   ├── session.go
+│   │   ├── user_contact.go
+│   │   └── user_info.go
+│   └── service/
+│       ├── chat/
+│       │   ├── client.go
+│       │   ├── kafka_server.go
+│       │   └── server.go
+│       ├── gorm/
+│       │   ├── chatroom_service.go
+│       │   ├── group_info_service.go
+│       │   ├── message_service.go
+│       │   ├── session_service.go
+│       │   ├── user_contact_service.go
+│       │   └── user_info_service.go
+│       ├── kafka/
+│       │   └── kafka_service.go
+│       ├── redis/
+│       │   └── redis_service.go
+│       └── sms/
+│           ├── local/
+│           │   └── user_info_service_local.go
+│           └── auth_code_service.go
+├── logs/
+│   └── test.log
+├── pkg/
+│   ├── constants/
+│   │   └── constants.go
+│   ├── enum/
+│   │   ├── contact/
+│   │   ├── contact_apply/
+│   │   ├── group_info/
+│   │   ├── message/
+│   │   ├── session/
+│   │   └── user_info/
+│   ├── ssl/
+│   │   ├── xxx.pem
+│   │   ├── xxx-key.pem
+│   │   └── tls_handler.go
+│   ├── util/
+│   │   └── random/
+│   │       └── random_int.go
+│   └── zlog/
+│       └── logger.go
+├── configs/
+│   ├── config.toml
+│   └── config_local.toml
+├── static/
+│   ├── avatars/
+│   │   └── ......
+│   └── files/
+│   │   └── ......
+├── web/
+│   └── (前端项目结构)
+├── .gitignore
+├── go.mod
+├── go.sum
+└── README.md
+
+```
+
+## 前端
+
+```
+web/chat-server/
+├── src/
+│   ├── assets/
+│   │   ├── cert/
+│   │   │   ├── xxx.pem
+│   │   │   ├── xxx-key.pem
+│   │   │   └── mkcert.exe
+│   │   ├── css/
+│   │   │   └── chat.css
+│   │   ├── img/
+│   │   │   └── chat_server_background.jpg
+│   │   ├── js/
+│   │   │   ├── random.js
+│   │   │   └── valid.js
+│   ├── components/
+│   │   ├── ContactListModal.vue
+│   │   ├── DeleteGroupModal.vue
+│   │   ├── DeleteUserModal.vue
+│   │   ├── DisableGroupModal.vue
+│   │   ├── DisableUserModal.vue
+│   │   ├── Modal.vue
+│   │   ├── NavigationModal.vue
+│   │   ├── SetAdminModal.vue
+│   │   ├── SmallModal.vue
+│   │   └── VideoModal.vue
+│   ├── router/
+│   │   └── index.js
+│   ├── store/
+│   │   └── index.js
+│   ├── views/
+│   │   ├── access/
+│   │   │   ├── Login.vue
+│   │   │   ├── Register.vue
+│   │   │   └── SmsLogin.vue
+│   │   ├── chat/
+│   │   │   ├── contact/
+│   │   │   │   ├── ContactChat.vue
+│   │   │   │   └── ContactList.vue
+│   │   │   ├── session/
+│   │   │   │   └── SessionList.vue
+│   │   │   └── user/
+│   │   │       └── OwnInfo.vue
+│   │   ├── manager/
+│   │       └── Manager.vue
+│   ├── App.vue
+│   └── main.js
+├── .gitignore
+├── package.json
+├── README.md
+└── vue.config.js
+```
 
 # 功能特性
 1. 即时通讯功能
@@ -321,157 +471,6 @@ echo "Deployment complete!"
 
 
 在Ubuntu22.04云服务器上执行该脚本，它就会自动部署相关的依赖，并把go后端和vue前端部署到对应的位置，之后的访问可以通过https://xxxxx:443去访问。如果在前端访问后端的时候报错“NetWork error”时，可能后端还没部署好，可以重启一下。
-
-# 项目结构
-
-## 后端
-
-```
-kama-chat-server/
-├── api/
-│   └── v1/
-│       └── chatroom_controller.go
-│       └── controller.go
-│       └── group_info_controller.go
-│       └── message_controller.go
-│       └── session_controller.go
-│       └── user_contact_controller.go
-│       └── user_info_controller.go
-│       └── ws_controller.go
-├── cmd/
-│   └── kama-chat-server/
-│       └── main.go
-├── internal/
-│   ├── config/
-│   │   └── config.go
-│   ├── dao/
-│   │   └── gorm.go
-│   ├── dto/
-│   │   ├── request/
-│   │   │   └── ......
-│   │   └── respond/
-│   │   │   └── ......
-│   ├── https_server/
-│   │   └── https_server.go
-│   ├── model/
-│   │   ├── contact_apply.go
-│   │   ├── group_info.go
-│   │   ├── message.go
-│   │   ├── session.go
-│   │   ├── user_contact.go
-│   │   └── user_info.go
-│   └── service/
-│       ├── chat/
-│       │   ├── client.go
-│       │   ├── kafka_server.go
-│       │   └── server.go
-│       ├── gorm/
-│       │   ├── chatroom_service.go
-│       │   ├── group_info_service.go
-│       │   ├── message_service.go
-│       │   ├── session_service.go
-│       │   ├── user_contact_service.go
-│       │   └── user_info_service.go
-│       ├── kafka/
-│       │   └── kafka_service.go
-│       ├── redis/
-│       │   └── redis_service.go
-│       └── sms/
-│           ├── local/
-│           │   └── user_info_service_local.go
-│           └── auth_code_service.go
-├── logs/
-│   └── test.log
-├── pkg/
-│   ├── constants/
-│   │   └── constants.go
-│   ├── enum/
-│   │   ├── contact/
-│   │   ├── contact_apply/
-│   │   ├── group_info/
-│   │   ├── message/
-│   │   ├── session/
-│   │   └── user_info/
-│   ├── ssl/
-│   │   ├── xxx.pem
-│   │   ├── xxx-key.pem
-│   │   └── tls_handler.go
-│   ├── util/
-│   │   └── random/
-│   │       └── random_int.go
-│   └── zlog/
-│       └── logger.go
-├── configs/
-│   ├── config.toml
-│   └── config_local.toml
-├── static/
-│   ├── avatars/
-│   │   └── ......
-│   └── files/
-│   │   └── ......
-├── web/
-│   └── (前端项目结构)
-├── .gitignore
-├── go.mod
-├── go.sum
-└── README.md
-
-```
-
-## 前端
-
-```
-web/chat-server/
-├── src/
-│   ├── assets/
-│   │   ├── cert/
-│   │   │   ├── xxx.pem
-│   │   │   ├── xxx-key.pem
-│   │   │   └── mkcert.exe
-│   │   ├── css/
-│   │   │   └── chat.css
-│   │   ├── img/
-│   │   │   └── chat_server_background.jpg
-│   │   ├── js/
-│   │   │   ├── random.js
-│   │   │   └── valid.js
-│   ├── components/
-│   │   ├── ContactListModal.vue
-│   │   ├── DeleteGroupModal.vue
-│   │   ├── DeleteUserModal.vue
-│   │   ├── DisableGroupModal.vue
-│   │   ├── DisableUserModal.vue
-│   │   ├── Modal.vue
-│   │   ├── NavigationModal.vue
-│   │   ├── SetAdminModal.vue
-│   │   ├── SmallModal.vue
-│   │   └── VideoModal.vue
-│   ├── router/
-│   │   └── index.js
-│   ├── store/
-│   │   └── index.js
-│   ├── views/
-│   │   ├── access/
-│   │   │   ├── Login.vue
-│   │   │   ├── Register.vue
-│   │   │   └── SmsLogin.vue
-│   │   ├── chat/
-│   │   │   ├── contact/
-│   │   │   │   ├── ContactChat.vue
-│   │   │   │   └── ContactList.vue
-│   │   │   ├── session/
-│   │   │   │   └── SessionList.vue
-│   │   │   └── user/
-│   │   │       └── OwnInfo.vue
-│   │   ├── manager/
-│   │       └── Manager.vue
-│   ├── App.vue
-│   └── main.js
-├── .gitignore
-├── package.json
-├── README.md
-└── vue.config.js
-```
 
 
 # docs
