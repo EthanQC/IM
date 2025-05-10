@@ -1,15 +1,27 @@
 # 项目概述
-1. 简介：这是一个前后端分离的即时通讯项目，具备后台管理、单聊群聊、联系人管理、多种消息（文本 / 文件 / 视频）处理、离线消息处理以及音视频通话等功能，旨在打造类似微信的聊天体验。
-2. 技术栈：
-   + 前端：Vue3、Vue Router、Vuex、WebSocket、Element - UI 等。
-   + 后端：Go、Gin、GORM、GoRedis、WebSocket、Kafka、WebRTC、Zap 日志库等。
+## 简介
+这是一个前后端分离的即时通讯项目，具备后台管理、单聊群聊、联系人管理、多种消息（文本 / 文件 / 视频）处理、离线消息处理以及音视频通话等功能，旨在打造类似微信的聊天体验
+
+这是一个全面的即时通讯解决方案，支持：
+
+* 一对一和群聊通信
+* 联系人管理
+* 消息历史记录和离线消息处理
+* 文件共享
+* 通过 WebRTC 进行音频/视频通话
+* 用于用户和组管理的管理面板
+
+## 技术栈
+
++ 前端：Vue3、Vue Router、Vuex、WebSocket、Element - UI 等
++ 后端：Go、Gin、GORM、GoRedis、WebSocket、Kafka、WebRTC、Zap 日志库等
 
 # 项目结构
 
 ## 后端
 
 ```
-kama-chat-server/
+IM/
 ├── api/
 │   └── v1/
 │       └── chatroom_controller.go
@@ -472,10 +484,6 @@ echo "Deployment complete!"
 
 在Ubuntu22.04云服务器上执行该脚本，它就会自动部署相关的依赖，并把go后端和vue前端部署到对应的位置，之后的访问可以通过https://xxxxx:443去访问。如果在前端访问后端的时候报错“NetWork error”时，可能后端还没部署好，可以重启一下。
 
-
-# docs
-
-在/docs/业务逻辑.md中，介绍了具体的业务设计，对业务有问题的同学可以查看了解一下。
 
 # todoList
 
