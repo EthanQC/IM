@@ -1,11 +1,12 @@
 package https_server
 
 import (
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	v1 "kama_chat_server/api/v1"
 	"kama_chat_server/internal/config"
 	"kama_chat_server/pkg/ssl"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 var GE *gin.Engine
