@@ -13,14 +13,22 @@ var GE *gin.Engine
 
 func init() {
 	GE = gin.Default()
+
+	// CORS 跨域配置
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{"*"}
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
 	GE.Use(cors.New(corsConfig))
+
+	// SSL/TLS 配置
 	GE.Use(ssl.TlsHandler(config.GetConfig().MainConfig.Host, config.GetConfig().MainConfig.Port))
+
+	// 静态文件服务
 	GE.Static("/static/avatars", config.GetConfig().StaticAvatarPath)
 	GE.Static("/static/files", config.GetConfig().StaticFilePath)
+
+	// 用户相关
 	GE.POST("/login", v1.Login)
 	GE.POST("/register", v1.Register)
 	GE.POST("/user/updateUserInfo", v1.UpdateUserInfo)
@@ -33,6 +41,8 @@ func init() {
 	GE.POST("/user/sendSmsCode", v1.SendSmsCode)
 	GE.POST("/user/smsLogin", v1.SmsLogin)
 	GE.POST("/user/wsLogout", v1.WsLogout)
+
+	// 群组相关
 	GE.POST("/group/createGroup", v1.CreateGroup)
 	GE.POST("/group/loadMyGroup", v1.LoadMyGroup)
 	GE.POST("/group/checkGroupAddMode", v1.CheckGroupAddMode)
@@ -46,11 +56,13 @@ func init() {
 	GE.POST("/group/updateGroupInfo", v1.UpdateGroupInfo)
 	GE.POST("/group/getGroupMemberList", v1.GetGroupMemberList)
 	GE.POST("/group/removeGroupMembers", v1.RemoveGroupMembers)
+
 	GE.POST("/session/openSession", v1.OpenSession)
 	GE.POST("/session/getUserSessionList", v1.GetUserSessionList)
 	GE.POST("/session/getGroupSessionList", v1.GetGroupSessionList)
 	GE.POST("/session/deleteSession", v1.DeleteSession)
 	GE.POST("/session/checkOpenSessionAllowed", v1.CheckOpenSessionAllowed)
+
 	GE.POST("/contact/getUserList", v1.GetUserList)
 	GE.POST("/contact/loadMyJoinedGroup", v1.LoadMyJoinedGroup)
 	GE.POST("/contact/getContactInfo", v1.GetContactInfo)
@@ -63,11 +75,15 @@ func init() {
 	GE.POST("/contact/getAddGroupList", v1.GetAddGroupList)
 	GE.POST("/contact/refuseContactApply", v1.RefuseContactApply)
 	GE.POST("/contact/blackApply", v1.BlackApply)
+
 	GE.POST("/message/getMessageList", v1.GetMessageList)
 	GE.POST("/message/getGroupMessageList", v1.GetGroupMessageList)
 	GE.POST("/message/uploadAvatar", v1.UploadAvatar)
 	GE.POST("/message/uploadFile", v1.UploadFile)
+
 	GE.POST("/chatroom/getCurContactListInChatRoom", v1.GetCurContactListInChatRoom)
+
+	// WebSocket
 	GE.GET("/wss", v1.WsLogin)
 
 }
