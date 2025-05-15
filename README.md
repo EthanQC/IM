@@ -38,6 +38,122 @@
   * 主要是用来流量削峰的，在高流量时让服务器能顺利处理大量消息
   * 可以顺带着好好学一遍 Kafka 和消息队列下来（可以顺便再看看要不要换其他的消息队列工具）
 
+重构后预期目录：
+
+```IM/                                    # Monorepo 根目录
+├── services/                         # 所有微服务
+│   ├── user-service/                 # 用户管理服务（边界上下文：User）
+│   │   ├── cmd/
+│   │   │   └── user-server/
+│   │   │       └── main.go           # 启动入口
+│   │   ├── internal/
+│   │   │   ├── domain/               # 领域层
+│   │   │   │   ├── entity/
+│   │   │   │   │   └── user.go       # User 实体
+│   │   │   │   ├── vo/
+│   │   │   │   │   └── email.go      # Email 值对象
+│   │   │   │   └── service/
+│   │   │   │       └── user_domain_service.go  # 跨实体业务（如密码重置）
+│   │   │   ├── application/          # 应用层（用例编排）
+│   │   │   │   └── usecase/
+│   │   │   │       ├── register_user.go
+│   │   │   │       └── login_user.go
+│   │   │   ├── ports/                # 端口层（接口定义）
+│   │   │   │   ├── in/
+│   │   │   │   │   └── user_usecase.go         # RegisterUserUseCase, LoginUseCase
+│   │   │   │   └── out/
+│   │   │   │       ├── user_repository.go     # UserRepo 接口
+│   │   │   │       └── auth_service.go        # TokenService 接口
+│   │   │   └── adapters/             # 适配器层（具体实现）
+│   │   │       ├── in/
+│   │   │       │   ├── http/
+│   │   │       │   │   └── user_controller.go
+│   │   │       │   └── grpc/
+│   │   │       │       └── user_grpc.go
+│   │   │       └── out/
+│   │   │           ├── db/
+│   │   │           │   └── gorm_user_repo.go
+│   │   │           └── auth/
+│   │   │               └── satoken_adapter.go
+│   │   ├── configs/
+│   │   │   ├── config.dev.yaml
+│   │   │   └── config.prod.yaml
+│   │   ├── Dockerfile
+│   │   └── go.mod
+│   │
+│   ├── chat-service/                 # 聊天服务（边界上下文：Chat）
+│   │   ├── cmd/chat-server/main.go
+│   │   ├── internal/
+│   │   │   ├── domain/
+│   │   │   │   ├── entity/
+│   │   │   │   │   └── message.go
+│   │   │   │   ├── vo/
+│   │   │   │   │   └── message_content.go
+│   │   │   │   └── service/
+│   │   │   │       └── chat_room_service.go    # 跨实体逻辑：群组广播
+│   │   │   ├── application/
+│   │   │   │   └── usecase/
+│   │   │   │       ├── send_message.go
+│   │   │   │       └── get_history.go
+│   │   │   ├── ports/
+│   │   │   │   ├── in/
+│   │   │   │   │   └── chat_usecase.go
+│   │   │   │   └── out/
+│   │   │   │       ├── message_repository.go
+│   │   │   │       └── event_publisher.go
+│   │   │   └── adapters/
+│   │   │       ├── in/
+│   │   │       │   ├── http/
+│   │   │       │   │   └── chat_controller.go
+│   │   │       │   └── ws/
+│   │   │       │       └── ws_adapter.go
+│   │   │       └── out/
+│   │   │           ├── db/
+│   │   │           │   └── gorm_message_repo.go
+│   │   │           └── mq/
+│   │   │               └── kafka_publisher.go
+│   │   ├── configs/
+│   │   ├── Dockerfile
+│   │   └── go.mod
+│   │
+│   └── group-service/                # 群组管理服务（同上）
+│       └── …
+│
+├── pkg/                              # 跨服务共享库
+│   ├── logger/                       # 日志封装
+│   ├── errors/                       # 统一错误定义
+│   ├── config/                       # 配置加载工具
+│   ├── utils/
+│   │   └── random/                   # 随机数工具
+│   └── constants/                    # 常量定义
+│
+├── charts/                           # Helm Charts 或 Kustomize
+│   ├── user-service/
+│   ├── chat-service/
+│   └── group-service/
+│
+├── scripts/
+│   ├── docker-compose.yml            # 本地一键跑通所有依赖和服务
+│   ├── dev-run.sh                    # Shell 脚本并行启动多个 main.go
+│   └── k8s/
+│       ├── dev/
+│       ├── test/
+│       └── prod/
+│
+├── docs/
+│   ├── context-map.md                # 上下文图
+│   ├── domain-model.png              # 领域模型图
+│   ├── api-spec.md                   # 接口文档
+│   └── architecture-overview.md      # 架构总览
+│
+├── config/
+│   ├── global-config.yaml            # 注册中心、网关、监控等全局配置
+│   └── registry-config.yaml
+│
+├── .gitignore
+└── README.md
+```
+
 ## 技术栈
 
 + 前端：Vue3、Vue Router、Vuex、WebSocket、Element - UI 等
