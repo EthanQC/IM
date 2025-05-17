@@ -40,9 +40,10 @@
 
 重构后预期目录：
 
-```IM/                                    # Monorepo 根目录
+```
+IM/                                # Monorepo 根目录
 ├── services/                         # 所有微服务
-│   ├── user-service/                 # 用户管理服务（边界上下文：User）
+│   ├── user-service/                 # 用户服务（边界上下文：User）
 │   │   ├── cmd/
 │   │   │   └── user-server/
 │   │   │       └── main.go           # 启动入口
@@ -55,9 +56,8 @@
 │   │   │   │   └── service/
 │   │   │   │       └── user_domain_service.go  # 跨实体业务（如密码重置）
 │   │   │   ├── application/          # 应用层（用例编排）
-│   │   │   │   └── usecase/
-│   │   │   │       ├── register_user.go
-│   │   │   │       └── login_user.go
+│   │   │   │   ├── register_user.go
+│   │   │   │   └── login_user.go
 │   │   │   ├── ports/                # 端口层（接口定义）
 │   │   │   │   ├── in/
 │   │   │   │   │   └── user_usecase.go         # RegisterUserUseCase, LoginUseCase
@@ -77,6 +77,7 @@
 │   │   │               └── satoken_adapter.go
 │   │   ├── configs/
 │   │   │   ├── config.dev.yaml
+│   │   │   ├── config.test.yaml
 │   │   │   └── config.prod.yaml
 │   │   ├── Dockerfile
 │   │   └── go.mod
@@ -92,9 +93,8 @@
 │   │   │   │   └── service/
 │   │   │   │       └── chat_room_service.go    # 跨实体逻辑：群组广播
 │   │   │   ├── application/
-│   │   │   │   └── usecase/
-│   │   │   │       ├── send_message.go
-│   │   │   │       └── get_history.go
+│   │   │   │   ├── send_message.go
+│   │   │   │   └── get_history.go
 │   │   │   ├── ports/
 │   │   │   │   ├── in/
 │   │   │   │   │   └── chat_usecase.go
@@ -113,11 +113,20 @@
 │   │   │           └── mq/
 │   │   │               └── kafka_publisher.go
 │   │   ├── configs/
+│   │   │   ├── config.dev.yaml
+│   │   │   ├── config.test.yaml
+│   │   │   └── config.prod.yaml
 │   │   ├── Dockerfile
 │   │   └── go.mod
 │   │
-│   └── group-service/                # 群组管理服务（同上）
-│       └── …
+│   ├── group-service/               # 群组服务
+│   │   └── …
+│   │
+│   ├── file-service/                # 文件服务
+│   │
+│   ├── auth-service/                # 认证服务
+│   │
+│   └── notification-service/        # 通知服务
 │
 ├── pkg/                              # 跨服务共享库
 │   ├── logger/                       # 日志封装
