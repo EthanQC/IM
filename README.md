@@ -125,6 +125,67 @@ IM/                                # Monorepo 根目录
 │   ├── file-service/                # 文件服务
 │   │
 │   ├── auth-service/                # 认证服务
+│   │   ├── cmd/
+│   │   │   └── auth-server/
+│   │   │       └── main.go                 # 服务启动入口
+│   │   ├── internal/
+│   │   │   ├── domain/                     # 领域层
+│   │   │   │   ├── entity/
+│   │   │   │   │   ├── auth_token.go      # Token实体
+│   │   │   │   │   └── auth_code.go       # 验证码实体  
+│   │   │   │   ├── vo/                    # 值对象
+│   │   │   │   │   ├── phone.go          # 手机号值对象
+│   │   │   │   │   └── password.go       # 密码值对象
+│   │   │   │   └── service/              
+│   │   │   │       └── auth_domain_service.go  # 领域服务
+│   │   │   │
+│   │   │   ├── application/               # 应用层 
+│   │   │   │   ├── auth/
+│   │   │   │   │   ├── generate_token.go     # Token生成用例
+│   │   │   │   │   ├── verify_token.go       # Token校验用例
+│   │   │   │   │   └── refresh_token.go      # Token刷新用例
+│   │   │   │   └── sms/
+│   │   │   │       ├── send_code.go          # 发送验证码用例
+│   │   │   │       └── verify_code.go        # 验证码校验用例
+│   │   │   │
+│   │   │   ├── ports/                     # 端口层
+│   │   │   │   ├── in/                    # 入站端口
+│   │   │   │   │   ├── auth_api.go        # 认证相关接口
+│   │   │   │   │   └── sms_api.go         # 短信相关接口
+│   │   │   │   └── out/                   # 出站端口
+│   │   │   │       ├── token_repo.go      # Token仓储接口
+│   │   │   │       └── sms_service.go     # 短信服务接口
+│   │   │   │
+│   │   │   └── adapters/                  # 适配器层
+│   │   │       ├── in/
+│   │   │       │   ├── http/              # HTTP适配器
+│   │   │       │   │   ├── auth_handler.go
+│   │   │       │   │   └── sms_handler.go
+│   │   │       │   └── grpc/              # gRPC适配器
+│   │   │       │       └── auth_server.go  
+│   │   │       └── out/
+│   │   │           ├── redis/             # Redis适配器
+│   │   │           │   └── token_repo_impl.go
+│   │   │           └── aliyun/            # 阿里云短信适配器
+│   │   │               └── sms_service_impl.go
+│   │   │
+│   │   ├── configs/                        # 配置文件
+│   │   │   ├── config.dev.yaml
+│   │   │   ├── config.test.yaml  
+│   │   │   └── config.prod.yaml
+│   │   │
+│   │   ├── api/                           # API定义
+│   │   │   └── proto/
+│   │   │       └── auth.proto
+│   │   │
+│   │   ├── pkg/                           # 工具包
+│   │   │   ├── jwt/
+│   │   │   │   └── jwt.go
+│   │   │   └── errors/
+│   │   │       └── auth_errors.go
+│   │   │
+│   │   ├── Dockerfile                    
+│   │   └── go.mod
 │   │
 │   └── notification-service/        # 通知服务
 │
