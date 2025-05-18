@@ -3,12 +3,14 @@ package errors
 import "errors"
 
 var (
-	// 错误定义
-	ErrInvalidPhone    = errors.New("手机号码错误")
-	ErrInvalidPassword = errors.New("密码错误")
+	// 身份验证相关
+	ErrInvalidToken = errors.New("无效或已过期的令牌")
+
+	// 验证码相关
 	ErrInvalidAuthCode = errors.New("验证码错误")
 	ErrCodeExpired     = errors.New("验证码已过期")
-	ErrTooManyAttempts = errors.New("过多次验证尝试")
-	ErrTooManyRequests = errors.New("过多次请求")
-	ErrCodeResendLimit = errors.New("验证码重发过多次")
+
+	// 值对象验证相关
+	ErrInvalidPhone    = errors.New("手机号码错误")
+	ErrInvalidPassword = errors.New("密码错误")
 )

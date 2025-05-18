@@ -1,7 +1,9 @@
 package vo
 
 import (
-	"regexp" // 正则表达式标准包
+	"regexp" // 正则表达式（regular expressio）标准包
+
+	"github.com/EthanQC/IM/services/auth-service/pkg/errors"
 )
 
 type Phone struct {
@@ -10,7 +12,7 @@ type Phone struct {
 
 func NewPhone(number string) (*Phone, error) {
 	if !isValidPhoneNumber(number) {
-		return nil, ErrInvalidPassword
+		return nil, errors.ErrInvalidPhone
 	}
 
 	return &Phone{Number: number}, nil

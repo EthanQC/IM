@@ -3,6 +3,7 @@ package entity
 import "time"
 
 type AuthCode struct {
+	ID         string    // 验证码唯一标识
 	Phone      string    // 手机号
 	Code       string    // 验证码
 	ExpireTime time.Time // 过期时间
