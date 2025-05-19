@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/EthanQC/IM/services/auth-service/internal/domain/vo"
+)
 
 type AuthToken struct {
 	ID           string    // Token 唯一标识
@@ -10,6 +14,7 @@ type AuthToken struct {
 	ExpiresAt    time.Time // 过期时间
 	CreatedAt    time.Time // 创建时间
 	IsRevoked    bool      // 是否已撤销
+	Roles        []vo.Role // 用户角色列表
 }
 
 func NewAuthToken(userID string) *AuthToken {
