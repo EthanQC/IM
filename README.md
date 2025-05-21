@@ -191,6 +191,28 @@ IM/                                # Monorepo 根目录
 │
 ├── pkg/                              # 跨服务共享库
 │   ├── logger/                       # 日志封装
+│   │   ├── config/
+│   │   │   └── config.go       # 日志配置结构
+│   │   ├── core/
+│   │   │   ├── level.go        # 日志级别定义
+│   │   │   └── field.go        # 日志字段定义
+│   │   ├── alert/
+│   │   │   ├── alerter.go      # 告警接口定义
+│   │   │   └── implementations/
+│   │   │       ├── email.go    # 邮件告警实现
+│   │   │       └── webhook.go  # Webhook告警实现
+│   │   ├── metrics/
+│   │   │   └── prometheus.go   # Prometheus指标收集
+│   │   ├── formatter/
+│   │   │   ├── formatter.go    # 格式化接口
+│   │   │   ├── json.go        # JSON格式化
+│   │   │   └── text.go        # 文本格式化
+│   │   ├── output/
+│   │   │   ├── writer.go      # 输出接口
+│   │   │   ├── file.go        # 文件输出
+│   │   │   └── console.go     # 控制台输出
+│   │   ├── logger.go          # 主日志实现
+│   │   └── options.go         # 日志选项配置
 │   ├── errors/                       # 统一错误定义
 │   ├── config/                       # 配置加载工具
 │   ├── utils/

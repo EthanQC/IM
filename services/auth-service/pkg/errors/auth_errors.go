@@ -22,4 +22,10 @@ var (
 
 	// 用户状态相关
 	ErrUserBlocked = errors.New("用户已被封禁")
+
+	// 令牌刷新相关
+	ErrRefreshTokenExpired = errors.New("刷新令牌已过期")
+
+	// 访问规则相关
+	ErrInvalidAccessRule = errors.New("无效的访问规则")
 )
