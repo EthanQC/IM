@@ -8,6 +8,7 @@ import (
 )
 
 // 定义本地轮转文件策略
+// tag 被 viper 用来匹配字段
 type FileConfig struct {
 	Path       string `mapstructure:"path"`        // 日志文件路径
 	MaxSizeMB  int    `mapstructure:"max_size"`    // 单个日志文件最大容量（MB）
@@ -28,11 +29,17 @@ type Config struct {
 
 // 加载配置
 func LoadConfig(filePath string) (*Config, error) {
+	// 新建 viper 实例
 	v := viper.New()
-	v.SetConfigFile(filePath)
-	v.AutomaticEnv()
-	v.SetEnvPrefix("ZLOG")
 
+	// 指定要解析传入的配置文件
+	v.SetConfigFile(filePath)
+
+	// 在配置文件中找不到某个配置项时，自动去查找相应的环境变量
+	v.AutomaticEnv()
+	v.SetEnvPrefix("ZLOG") // 查环境变量时只会匹配 ZLOG 开头的环境变量
+
+	// 读取并解析指定的配置文件
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("读取日志配置文件失败：%w", err)
 	}
@@ -47,7 +54,7 @@ func LoadConfig(filePath string) (*Config, error) {
 	v.SetDefault("file.max_age", 1)
 	v.SetDefault("enable_metric", true)
 
-	// 反序列化到结构体
+	// 反序列化加载到新的结构体
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("加载日志配置失败：%w", err)

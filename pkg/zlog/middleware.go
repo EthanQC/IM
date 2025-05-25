@@ -7,14 +7,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// GinLogger 在每个请求中放入 traceID / requestID，你可替换成自家 header
+// 在每个请求中放入 traceID / requestID
 func GinLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		traceID := c.GetHeader("X-Trace-Id")
-		reqID := c.GetHeader("X-Request-Id")
+		traceID := c.GetHeader("Trace-Id")
+		reqID := c.GetHeader("Request-Id")
 
-		l := zap.L().With(
+		base := FromContext(c.Request.Context())
+
+		l := base.With(
 			zap.String("trace_id", traceID),
 			zap.String("request_id", reqID),
 			zap.String("method", c.Request.Method),
