@@ -1,87 +1,180 @@
 # 日志模块说明
+
 本日志模块基于 Uber 开源的 Zap 日志库二次自定义封装而成，提供了**多目标输出**、**动态日志级别**、**Context 传递**、**可选指标埋点**等功能
+
+## 模块架构图
 
 ```mermaid
 flowchart TB
-  subgraph Service Startup
-    A1(Load Config)
-    A2[config.go]
-    A3(New 或 MustInitGlobal)
-    A1 --> A2
-    A2 --> A3
-  end
+    %% 定义子图样式
+    classDef subgraphStyle fill:#f5f5f5,stroke:#666,stroke-width:2px
+    classDef mainNodeStyle fill:#e1f5fe,stroke:#0288d1,stroke-width:2px 
+    classDef configNodeStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef outputNodeStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,stroke-dasharray: 5 5
+    classDef globalNodeStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
 
-  subgraph Core Assembly
-    B1(initLevel & wrapWithMetric)
-    B2[core.go]
-    B3[writer.go]
-    B4[metrics.go]
-    A3 --> B1
-    B1 --> B2
-    B2 --> B3
-    B2 --> B4
-  end
+    %% 全局实例管理
+    subgraph Global["全局实例"]
+        direction TB
+        Default["默认 Logger"] 
+        Replace["替换全局 logger<br/>global.go"]
+        Signal["信号处理<br/>优雅关闭"]
+        Default --> Replace
+        Replace --> Signal
+        class Default,Replace,Signal globalNodeStyle
+    end
 
-  subgraph Outputs
-    O1((Console))
-    O2((File: lumberjack))
-  end
-  B3 --> O1 & O2
+    %% 服务启动流程
+    subgraph Init["服务初始化"]
+        direction TB
+        Load("加载配置") --> Config["config.go"] 
+        Config --> New("创建 Logger 实例")
+        class Load,Config,New mainNodeStyle
+    end
 
-  subgraph Runtime Controls
-    R1[HTTP /log/level]
-    R2[kill -HUP]
-    R1 --> level.go
-    R2 --> level.go
-  end
+    %% 核心组件
+    subgraph Core["核心组件"]
+        direction TB
+        Level("日志级别管理<br/>level.go") 
+        Writer["输出管理<br/>writer.go"]
+        Metric["指标收集<br/>metrics.go"]
+        Main["核心逻辑<br/>core.go"]
+        
+        Level --> Main
+        Main --> Writer
+        Main --> Metric
+        class Level,Writer,Metric,Main mainNodeStyle
+    end
 
-  subgraph Context & Middleware
-    C1[ctx.go]
-    C2[middleware.go]
-    C2 --> C1
-    C1 --> core.go
-  end
+    %% 输出目标
+    subgraph Output["输出目标"]
+        Console[("控制台输出")]
+        File[("文件输出<br/>lumberjack")]
+        class Console,File outputNodeStyle
+    end
 
-  style Service Startup fill:#f9f,stroke:#333,stroke-width:1px
-  style Core Assembly fill:#bbf,stroke:#333,stroke-width:1px
-  style Outputs fill:#bfb,stroke:#333,stroke-width:1px
-  style Runtime Controls fill:#fbf,stroke:#333,stroke-width:1px
-  style Context Middleware fill:#ffb,stroke:#333,stroke-width:1px
+    %% 中间件集成
+    subgraph Middleware["中间件与上下文"]
+        direction LR
+        Mid["HTTP中间件<br/>middleware.go"] --> Ctx["Context传递<br/>ctx.go"]
+        class Mid,Ctx mainNodeStyle
+    end
+
+    %% 动态控制
+    subgraph Control["运行时控制"]
+        direction TB
+        HTTP["HTTP 接口<br/>/log/level"] --> LevelCtl["动态调整<br/>level.go"]
+        Signal2["信号处理<br/>kill -HUP"] --> LevelCtl
+        class HTTP,Signal2,LevelCtl configNodeStyle
+    end
+
+    %% 连接关系
+    Init --> Core
+    Core --> Output
+    Middleware --> Core
+    Control --> Core
+    Global --> Core
+
+    %% 应用整体样式
+    class Init,Core,Output,Middleware,Control,Global subgraphStyle
 ```
 
-### 文件及查看顺序
-#### config.go 
-使用 `viper` 第三方库管理配置信息，主要提供 `LoadConfig` 方法加载配置文件
+## 核心功能
+### 1. 全局实例管理 (global.go)
+- 提供全局默认 logger
+- 支持安全地替换全局实例
+- 处理服务优雅关闭
 
-负责加载并校验 `zlog.yaml`（或其他格式）配置，包括服务名、日志级别、编码、输出目标、文件轮转及指标开关等参数
+### 2. 配置管理 (config.go) 
+- 支持多环境配置
+- 日志输出路径配置
+- 日志级别配置
+- 编码格式配置(JSON/Console)
+- 文件切割配置
 
-#### level.go
-基于原子操作实现了并发安全地热更新日志级别，
+### 3. 日志级别管理 (level.go)
+- 支持动态调整日志级别
+- 提供HTTP接口动态修改
+- 支持信号触发级别调整
 
-解析字符串到 `zapcore.Level`，提供热更新接口 `SetLevel` 和 HTTP 管理端点 `LevelHTTPHandler`  
+### 4. 输出管理 (writer.go)
+- 支持同时输出到多个目标
+- 文件自动切割归档
+- 并发安全的写入
 
-#### writer.go
-根据配置构建写入器：可选输出到 `stdout`、本地文件（lumberjack 轮转）、以及未来扩展的 Kafka/Loki/OTLP。  
+### 5. 上下文集成 (ctx.go)
+- 支持链路追踪
+- Context传递关键信息
+- 支持Fields扩展
 
-#### core.go
-核心组装：根据环境选择编码器（开发/生产）、构造 `zapcore.Core`（编码 + 写入 + 过滤），并附加 Caller、service 字段及可选 Prometheus 埋点。  
+### 6. 中间件支持 (middleware.go)
+- 集成HTTP请求日志
+- 记录请求耗时
+- 支持自定义字段
 
-#### global.go
-提供 `MustInitGlobal`：一行初始化全局 Logger，并注册 Unix 信号 `SIGHUP` 切换级别功能（`kill -HUP`）。  
+### 7. 监控指标 (metrics.go)
+- 统计日志数量
+- 记录日志级别分布
+- 监控写入延迟
 
-#### ctx.go
-基于 Go `context`，在请求链中传递 `*zap.Logger`：`WithContext` 注入，`FromContext/C` 安全取出并优雅回退。 
+## 使用示例
 
-#### middleware.go
-针对 Gin 框架的中间件示例：从 Context 拿 Logger，附加 traceID、requestID、HTTP 方法与路径，注入下游并在请求结束时打印访问日志。  
+1. 基础使用:
+```go
+// 初始化全局 logger
+zlog.MustInitGlobal(zlog.Config{
+    Level:  "info",
+    File: zlog.FileConfig{
+        Path:   "logs/app.log",
+        MaxSize: 100,    // MB
+    },
+})
 
-#### metrics.go
-可选 Prometheus 指标：`app_log_total{service, level}` 计数，提供注册方法 `RegisterMetrics` 和 Zap Core 装饰器 `wrapWithMetric`。  
+// 记录日志
+zlog.Info("user login", 
+    zlog.String("user_id", "123"),
+    zlog.Int("login_count", 5),
+)
+```
 
+2. 带Context使用:
+```go
+logger := zlog.FromContext(ctx)
+logger.Info("process message",
+    zlog.String("msg_id", msgID),
+    zlog.Any("payload", payload),
+)
+```
 
-## 全局日志模块
+3. HTTP中间件:
+```go
+r := gin.New()
+r.Use(zlog.GinLogger()) 
+```
 
-为什么不选择热加载和 Kafka：
+## 性能考虑
+1. 使用sync.Pool复用对象
+2. 支持采样记录
+3. 异步写入选项
+4. 批量写入缓冲
+
+## 后续规划
+1. 集成ELK支持
+2. 完善告警机制
+3. 增加更多监控指标
+4. 支持日志采样
+5. 增强链路追踪
+
+## 注意事项
+1. 正确设置日志级别避免性能问题
+2. 定期清理归档日志
+3. 合理配置文件切割大小
+4. 避免频繁替换全局 logger
+5. panic 前确保日志刷盘
+
+## 技术选型相关
+
+#### 为什么不选择热加载和 Kafka
 
 * 目前项目规模较小
 * 热加载主要用途是无需重启服务，能动态调整配置
