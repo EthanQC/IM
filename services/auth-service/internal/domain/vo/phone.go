@@ -1,7 +1,7 @@
 package vo
 
 import (
-	"regexp" // 正则表达式（regular expressio）标准包
+	"regexp" // 正则表达式（regular expression）标准包
 
 	"github.com/EthanQC/IM/services/auth-service/pkg/errors"
 )
@@ -26,6 +26,7 @@ func NewPhone(number string) (*Phone, error) {
 // \d{9} 表示后面再跟恰好九个数字，\d 表示任意数字，{9} 表示重复九次
 var phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 
+// 校验手机号是否有效：11 位
 func isValidPhoneNumber(number string) bool {
 	return phoneRegex.MatchString(number)
 }
