@@ -1,10 +1,14 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/EthanQC/IM/services/auth-service/internal/domain/vo"
+)
 
 type AuthCode struct {
 	ID         string    // 验证码唯一标识
-	Phone      string    // 手机号
+	Phone      vo.Phone  // 手机号
 	Code       string    // 验证码
 	ExpireTime time.Time // 过期时间
 	AttemptCnt int       // 验证尝试次数
@@ -13,7 +17,7 @@ type AuthCode struct {
 	IPAddress  string    // 请求 IP，用于限流
 }
 
-func NewAuthCode(phone string, ip string) *AuthCode {
+func NewAuthCode(phone vo.Phone, ip string) *AuthCode {
 	return &AuthCode{
 		Phone:      phone,
 		CreateTime: time.Now(),

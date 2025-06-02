@@ -1,6 +1,14 @@
 # `auth-service`
 `Auth-Service` 提供统一的身份认证与权限管理能力，包含登录认证、令牌中心、RBAC 授权、短信验证码等模块，对外暴露 HTTP / gRPC 两套接口
 
+## 常用命令
+* 后台(detached) 启动容器：`docker compose up -d`
+  * 终端可立即退出，日志可用 `docker compose logs -f` 查看
+* 前台启动并实时打印容器日志：`docker compose up`
+  * `Ctrl-C` 会把容器一起停掉
+* 进入容器的 MySQL Shell：`docker exec -it auth_mysql mysql -u root -p wkr1835484520 auth_service`
+* 进入容器的 redis cli：`docker exec -it auth_redis redis-cli`
+
 ## 业务流程
 #### 注册（注册成功后才能登录）
 * 填写信息
