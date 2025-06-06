@@ -15,7 +15,4 @@ type AuthUseCase interface {
 	LoginByPassword(ctx context.Context, identifier string, password vo.Password) (*entity.AuthToken, error)
 	LoginBySMS(ctx context.Context, phone vo.Phone, code string) (*entity.AuthToken, error)
 	Logout(ctx context.Context, accessJTI string) error
-
-	// 发送短信验证码
-	SendSMSCode(ctx context.Context, phone vo.Phone, ip string) error
 }

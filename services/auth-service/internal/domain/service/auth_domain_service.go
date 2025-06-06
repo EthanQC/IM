@@ -30,19 +30,6 @@ func (s *AuthDomainService) ValidateAccess(rule *vo.AccessRule, token *entity.Au
 	return errors.ErrPermissionDenied
 }
 
-// 验证验证码
-func (s *AuthDomainService) ValidateAuthCode(code *entity.AuthCode, token *entity.AuthToken) error {
-	if code.IsExpired() {
-		return errors.ErrCodeExpired
-	}
-
-	if code.HasExceededMaxAttempts() {
-		return errors.ErrTooManyAttempts
-	}
-
-	return nil
-}
-
 // ValidateToken 验证令牌状态
 func (s *AuthDomainService) ValidateToken(token *entity.AuthToken, userStatus *entity.UserStatus) error {
 	// 1. 检查令牌是否过期

@@ -1,10 +1,13 @@
 server: # Gin/HTTP 服务本身
-  port: 8080 # 本地监听端口                                                      
+  port: 8080 # 本地监听端口     
+
 jwt:  
   secret: "super-secret-change-me" # HMAC 密钥（大于等于 32 字符），上线后一旦修改全部旧 token 都会失效
   access_ttl: 15m                  # AccessToken 生存时间
   refresh_ttl: 168h                # RefreshToken 生存时间，7d
+
 redis:
   addr: "localhost:6379"
+  
 mysql:
   dsn: "root:wkr1835484520@tcp(localhost:3306)/auth_service?parseTime=true&loc=Local" # data source name

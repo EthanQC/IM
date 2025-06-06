@@ -8,6 +8,7 @@ import (
 
 type Phone struct {
 	Number string
+	IP     string
 }
 
 func NewPhone(number string) (*Phone, error) {
