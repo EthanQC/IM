@@ -6,6 +6,7 @@
   * 终端可立即退出，日志可用 `docker compose logs -f` 查看
 * 前台启动并实时打印容器日志：`docker compose up`
   * `Ctrl-C` 会把容器一起停掉
+* 查看当前正在运行的容器：`docker compose ps`
 * 进入容器的 MySQL Shell：`docker exec -it auth_mysql mysql -u root -p wkr1835484520 auth_service`
 * 进入容器的 redis cli：`docker exec -it auth_redis redis-cli`
 
@@ -23,7 +24,7 @@
 * 结果
   * 任一字段不合法都会返回对应的错误码，前端再提示错误类型
   * 全部合法则会写表，返回 `201 Created`，前端再提示注册成功
-
+ 
 #### 登录
 * 登录是身份验证 AuthN，解决你是谁
 * 登陆方式
