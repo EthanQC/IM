@@ -14,11 +14,11 @@ type KafkaEventBus struct {
 	producer sarama.SyncProducer
 }
 
-// NewKafkaEventBus 构造函数
+// NewKafkaEventBus 创建一个 KafkaEventBus 实例
 func NewKafkaEventBus(brokers []string) (out.EventBus, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
-	// clientID、ACK 等可以根据需要配置
+	config.Producer.Partitioner = sarama.NewRandomPartitioner
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
 		return nil, err
@@ -26,9 +26,11 @@ func NewKafkaEventBus(brokers []string) (out.EventBus, error) {
 	return &KafkaEventBus{producer: producer}, nil
 }
 
-func (k *KafkaEventBus) Publish(ctx context.Context, topic string, payload interface{}) error {
+// Publish 将事件序列化为 JSON 并发送到指定 Kafka topic
+func (k *KafkaEventBus) Publish(ctx context.Context, topic string, payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
+		zap.L().Error("事件序列化失败", zap.String("topic", topic), zap.Error(err))
 		return err
 	}
 	msg := &sarama.ProducerMessage{
@@ -37,8 +39,13 @@ func (k *KafkaEventBus) Publish(ctx context.Context, topic string, payload inter
 	}
 	partition, offset, err := k.producer.SendMessage(msg)
 	if err != nil {
+		zap.L().Error("Kafka Publish 失败", zap.String("topic", topic), zap.Error(err))
 		return err
 	}
-	zap.L().Info("Kafka Publish 成功", zap.String("topic", topic), zap.Int32("partition", partition), zap.Int64("offset", offset))
+	zap.L().Info("Kafka Publish 成功",
+		zap.String("topic", topic),
+		zap.Int32("partition", partition),
+		zap.Int64("offset", offset),
+	)
 	return nil
 }

@@ -34,7 +34,7 @@ func (r *RefreshTokenRepoMysql) Find(ctx context.Context, token string) (*entity
 func (r *RefreshTokenRepoMysql) UpdateExpiry(ctx context.Context, token string, newExp int64) error {
 	return r.db.WithContext(ctx).
 		Model(&entity.AuthToken{}).
-		Where("refresh_jit = ?", token).
+		Where("refresh_jti = ?", token).
 		Update("refresh_exp_at", newExp).Error
 }
 
