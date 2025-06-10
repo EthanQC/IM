@@ -5,7 +5,7 @@ import (
 
 	// 日志轮转工具库，能按照文件大小、天数、备份数量自动切分日志文件，也可以对旧日志进行 gzip 压缩
 	// 还实现了 io.Writer 接口，能像写普通文件一样直接往它写日志
-	"github.com/natefinch/lumberjack"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"go.uber.org/zap/zapcore"
 )

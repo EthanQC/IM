@@ -1,6 +1,6 @@
 # 日志模块说明
 
-本日志模块基于 Uber 开源的 Zap 日志库二次自定义封装而成，提供了**多目标输出**、**动态日志级别**、**Context 传递**、**可选指标埋点**等功能
+本日志模块基于 Uber 开源的 Zap 日志库二次自定义封装而成，提供了**多目标输出**、**动态日志级别**、**Context 传递**、**指标埋点**等功能
 
 ## 模块架构图
 
@@ -79,65 +79,63 @@ flowchart TB
     class Init,Core,Output,Middleware,Control,Global subgraphStyle
 ```
 
-## 核心功能
-### 1. 全局实例管理 (global.go)
-- 提供全局默认 logger
-- 支持安全地替换全局实例
-- 处理服务优雅关闭
+## 快速上手
+#### go.work 管理
+假设你的项目结构如下：
 
-### 2. 配置管理 (config.go) 
-- 支持多环境配置
-- 日志输出路径配置
-- 日志级别配置
-- 编码格式配置(JSON/Console)
-- 文件切割配置
+    IM/
+    ├── go.work
+    ├── pkg/
+    │   └── zlog/              ← 本模块
+    └── services/
+        └── myservice/         ← 你的微服务
 
-### 3. 日志级别管理 (level.go)
-- 支持动态调整日志级别
-- 提供HTTP接口动态修改
-- 支持信号触发级别调整
+在 `IM/` 根目录运行 `go work init ./pkg/zlog ./services/myservice`，此时在 `myservice` 下直接 `import "github.com/EthanQC/IM/pkg/zlog"` 即可引用本地日志模块
 
-### 4. 输出管理 (writer.go)
-- 支持同时输出到多个目标
-- 文件自动切割归档
-- 并发安全的写入
-
-### 5. 上下文集成 (ctx.go)
-- 支持链路追踪
-- Context传递关键信息
-- 支持Fields扩展
-
-### 6. 中间件支持 (middleware.go)
-- 集成HTTP请求日志
-- 记录请求耗时
-- 支持自定义字段
-
-### 7. 监控指标 (metrics.go)
-- 统计日志数量
-- 记录日志级别分布
-- 监控写入延迟
-
-## 使用示例
-
-1. 基础使用:
+#### 使用示例
+先在各个微服务的 `main` 文件中初始化：
 ```go
-// 初始化全局 logger
-zlog.MustInitGlobal(zlog.Config{
-    Level:  "info",
-    File: zlog.FileConfig{
-        Path:   "logs/app.log",
-        MaxSize: 100,    // MB
-    },
-})
+// 加载日志配置
+cfgPath := "config/zlog.yaml"
+cfg, err := zlog.LoadConfig(cfgPath)
 
+if err != nil {
+    panic("日志配置加载失败：" + err.Error())
+}
+
+// 初始化全局 logger
+zlog.MustInitGlobal(*cfg)
+defer zlog.Sync()
+
+// 注册 Prometheus 指标（待具体实现）
+// zlog.RegisterMetrics(prometheus.DefaultRegisterer)
+
+// 加载 Gin 中间件
+r := gin.New()
+r.use(
+    zlog.GinLogger(),
+    gin.Recovery(),
+)
+
+// 动态调整日志级别
+r.PUT("/log/level", zlog.LevelHTTPHandler())
+
+// 暴露 Prometheus /metrics
+// r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+```
+
+基础使用:
+```go
 // 记录日志
 zlog.Info("user login", 
     zlog.String("user_id", "123"),
     zlog.Int("login_count", 5),
 )
+
+zlog.Debug("开始处理任务", zlog.String("task_id", id))
 ```
 
-2. 带Context使用:
+带Context使用:
 ```go
 logger := zlog.FromContext(ctx)
 logger.Info("process message",
@@ -146,34 +144,7 @@ logger.Info("process message",
 )
 ```
 
-3. HTTP中间件:
-```go
-r := gin.New()
-r.Use(zlog.GinLogger()) 
-```
-
-## 性能考虑
-1. 使用sync.Pool复用对象
-2. 支持采样记录
-3. 异步写入选项
-4. 批量写入缓冲
-
-## 后续规划
-1. 集成ELK支持
-2. 完善告警机制
-3. 增加更多监控指标
-4. 支持日志采样
-5. 增强链路追踪
-
-## 注意事项
-1. 正确设置日志级别避免性能问题
-2. 定期清理归档日志
-3. 合理配置文件切割大小
-4. 避免频繁替换全局 logger
-5. panic 前确保日志刷盘
-
 ## 技术选型相关
-
 #### 为什么不选择热加载和 Kafka
 
 * 目前项目规模较小
