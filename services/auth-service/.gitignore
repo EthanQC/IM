@@ -1,0 +1,9 @@
+# 日志文件
+logs/
+*.log
+
+# 配置文件
+configs/dev/
+configs/test/
+configs/prod/
+docker-compose.yml

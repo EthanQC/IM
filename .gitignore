@@ -40,3 +40,53 @@ internal/service/kafka/start.bat
 *.sh
 
 *.ext
+
+# IDE 和编辑器文件
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译生成的文件
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 依赖文件
+vendor/
+
+# 日志文件
+logs/
+*.log
+
+# 配置文件(可能包含敏感信息)
+configs/dev/
+configs/prod/
+*.env
+
+# 证书和密钥文件
+*.pem
+*.key
+*.crt
+
+# 临时文件
+tmp/
+temp/
+
+# 测试覆盖率报告
+coverage.out
+coverage.html
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Redis 数据文件和快照
+dump.rdb
+*.rdb
+
+# 测试数据库文件
+*.db
+*.sqlite
