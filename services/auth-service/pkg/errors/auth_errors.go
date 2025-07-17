@@ -3,11 +3,6 @@ package errors
 import "errors"
 
 var (
-	// 验证码相关
-	ErrCodeExpired     = errors.New("验证码已过期")
-	ErrTooManyAttempts = errors.New("验证尝试次数过多")
-	ErrInvalidCode     = errors.New("验证码错误")
-
 	// 值对象验证相关
 	ErrInvalidPhone    = errors.New("手机号码错误")
 	ErrInvalidPassword = errors.New("密码错误")

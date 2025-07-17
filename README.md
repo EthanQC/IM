@@ -41,7 +41,7 @@
 重构后预期目录：
 
 ```
-IM/                                # Monorepo 根目录
+IM/                                   # Monorepo 根目录
 ├── services/                         # 所有微服务
 │   ├── user-service/                 # 用户服务（边界上下文：User）
 │   │   ├── cmd/
@@ -134,19 +134,19 @@ IM/                                # Monorepo 根目录
 │   │   │   │   │   ├── auth_token.go      # Token实体
 │   │   │   │   │   └── auth_code.go       # 验证码实体  
 │   │   │   │   ├── vo/                    # 值对象
-│   │   │   │   │   ├── phone.go          # 手机号值对象
-│   │   │   │   │   └── password.go       # 密码值对象
+│   │   │   │   │   ├── phone.go           # 手机号值对象
+│   │   │   │   │   └── password.go        # 密码值对象
 │   │   │   │   └── service/              
 │   │   │   │       └── auth_domain_service.go  # 领域服务
 │   │   │   │
 │   │   │   ├── application/               # 应用层 
 │   │   │   │   ├── auth/
-│   │   │   │   │   ├── generate_token.go     # Token生成用例
-│   │   │   │   │   ├── verify_token.go       # Token校验用例
-│   │   │   │   │   └── refresh_token.go      # Token刷新用例
+│   │   │   │   │   ├── generate_token.go  # Token生成用例
+│   │   │   │   │   ├── verify_token.go    # Token校验用例
+│   │   │   │   │   └── refresh_token.go   # Token刷新用例
 │   │   │   │   └── sms/
-│   │   │   │       ├── send_code.go          # 发送验证码用例
-│   │   │   │       └── verify_code.go        # 验证码校验用例
+│   │   │   │       ├── send_code.go       # 发送验证码用例
+│   │   │   │       └── verify_code.go     # 验证码校验用例
 │   │   │   │
 │   │   │   ├── ports/                     # 端口层
 │   │   │   │   ├── in/                    # 入站端口
