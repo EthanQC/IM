@@ -8,6 +8,24 @@ jwt:
 
 redis:
   addr: "localhost:6379"
+  password: ""
+  db: 0
   
 mysql:
   dsn: "root:wkr1835484520@tcp(localhost:3306)/auth_service?parseTime=true&loc=Local" # data source name
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "auth-events"
+
+code:
+  ttl: 5m
+  max_attempts: 5
+
+sms:
+  region: "cn-hangzhou"
+  access_key_id: "AK..."
+  access_key_secret: "SK..."
+  sign_name: "YourSign"
+  template_code: "SMS_123456"

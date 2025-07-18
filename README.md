@@ -399,6 +399,10 @@ web/chat-server/
 8. redis缓存：使用 GoRedis 进行缓存操作，提高系统性能。
 9. WebSocket：使用 WebSocket 实现实时消息推送，保证消息的实时性。
 
+安装 Protoc 插件：
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
 # 安装与运行
 此次安装运行为一键部署，即可在Ubuntu22.04的云服务器上部署上线，公网都可以访问。
 在执行脚本代码之前，需要做一些前置准备。

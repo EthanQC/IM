@@ -2,10 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/EthanQC/IM/services/auth-service/internal/domain/vo"
 	"github.com/EthanQC/IM/services/auth-service/internal/ports/in"
+	authErr "github.com/EthanQC/IM/services/auth-service/pkg/errors"
 )
 
 type AuthHandler struct {
@@ -23,85 +25,118 @@ func (h *AuthHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/logout", h.logout)
 }
 
+type authRequest struct {
+	Identifier string `json:"identifier"`
+	Password   string `json:"password"`
+}
+
+type smsLoginRequest struct {
+	Phone string `json:"phone"`
+	Code  string `json:"code"`
+}
+
+type refreshRequest struct {
+	RefreshJTI string `json:"refresh_jti"`
+}
+
+type logoutRequest struct {
+	AccessJTI string `json:"access_jti"`
+}
+
+type authResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type errorResponse struct {
+	Error string `json:"error"`
+}
+
 func (h *AuthHandler) loginByPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req struct {
-		Identifier string `json:"identifier"`
-		Password   string `json:"password"`
-	}
+	var req authRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
 	pw, err := vo.NewPassword(req.Password)
 	if err != nil {
-		http.Error(w, "invalid password format", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid password format"})
 		return
 	}
 	at, err := h.authUC.LoginByPassword(ctx, req.Identifier, *pw)
 	if err != nil {
-		http.Error(w, "authentication failed", http.StatusUnauthorized)
+		status := mapAuthError(err)
+		writeJSON(w, status, errorResponse{err.Error()})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(at)
+	writeJSON(w, http.StatusOK, authResponse{at.AccessToken, at.RefreshToken})
 }
 
 func (h *AuthHandler) loginBySMS(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req struct {
-		Phone string `json:"phone"`
-		Code  string `json:"code"`
-		IP    string `json:"ip"`
-	}
+	var req smsLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
 	phoneVO, err := vo.NewPhone(req.Phone)
 	if err != nil {
-		http.Error(w, "invalid phone number", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{authErr.ErrInvalidPhone.Error()})
 		return
 	}
 	at, err := h.authUC.LoginBySMS(ctx, *phoneVO, req.Code)
 	if err != nil {
-		http.Error(w, "authentication failed", http.StatusUnauthorized)
+		status := mapAuthError(err)
+		writeJSON(w, status, errorResponse{err.Error()})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(at)
+	writeJSON(w, http.StatusOK, authResponse{at.AccessToken, at.RefreshToken})
 }
 
 func (h *AuthHandler) refreshToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req struct {
-		RefreshJTI string `json:"refresh_jti"`
-	}
+	var req refreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
 	at, err := h.authUC.RefreshToken(ctx, req.RefreshJTI)
 	if err != nil {
-		http.Error(w, "refresh failed", http.StatusUnauthorized)
+		writeJSON(w, http.StatusUnauthorized, errorResponse{err.Error()})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(at)
+	writeJSON(w, http.StatusOK, authResponse{at.AccessToken, at.RefreshToken})
 }
 
 func (h *AuthHandler) logout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req struct {
-		AccessJTI string `json:"access_jti"`
-	}
+	var req logoutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
 	if err := h.authUC.Logout(ctx, req.AccessJTI); err != nil {
-		http.Error(w, "logout failed", http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{"logout failed"})
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func mapAuthError(err error) int {
+	switch {
+	case errors.Is(err, authErr.ErrInvalidPassword),
+		errors.Is(err, authErr.ErrInvalidToken):
+		return http.StatusUnauthorized
+	case errors.Is(err, authErr.ErrUserBlocked):
+		return http.StatusForbidden
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }

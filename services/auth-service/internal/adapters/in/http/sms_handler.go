@@ -6,6 +6,7 @@ import (
 
 	"github.com/EthanQC/IM/services/auth-service/internal/domain/vo"
 	"github.com/EthanQC/IM/services/auth-service/internal/ports/in"
+	smsErr "github.com/EthanQC/IM/services/auth-service/pkg/errors"
 )
 
 type SMSHandler struct {
@@ -20,23 +21,26 @@ func (h *SMSHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/sms/send", h.sendCode)
 }
 
+type sendCodeRequest struct {
+	Phone string `json:"phone"`
+	IP    string `json:"ip"`
+}
+
 func (h *SMSHandler) sendCode(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var req struct {
-		Phone string `json:"phone"`
-		IP    string `json:"ip"`
-	}
+	var req sendCodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
 	phoneVO, err := vo.NewPhone(req.Phone)
 	if err != nil {
-		http.Error(w, "invalid phone number", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, errorResponse{smsErr.ErrInvalidCode.Error()})
 		return
 	}
 	if err := h.smsUC.SendSMSCode(ctx, *phoneVO, req.IP); err != nil {
-		http.Error(w, "send sms failed", http.StatusInternalServerError)
+		// 可以根据 smsErr.ErrTooManyAttempts 等进一步区分
+		writeJSON(w, http.StatusInternalServerError, errorResponse{err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

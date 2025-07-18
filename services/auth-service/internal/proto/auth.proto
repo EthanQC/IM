@@ -1,0 +1,56 @@
+syntax = "proto3";
+package auth;
+
+option go_package = "github.com/EthanQC/IM/services/auth-service/internal/proto;authpb";
+
+import "google/protobuf/empty.proto";
+
+message SendCodeRequest {
+  string phone = 1;
+  string ip    = 2;
+}
+message SendCodeResponse {
+  bool   success = 1;
+  string error   = 2;
+}
+
+message LoginRequest {
+  string identifier = 1;
+  string password   = 2;
+}
+message LoginResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string error         = 3;
+}
+
+message SMSLoginRequest {
+  string phone = 1;
+  string code  = 2;
+}
+message SMSLoginResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string error         = 3;
+}
+
+message RefreshRequest {
+  string refresh_jti = 1;
+}
+message RefreshResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string error         = 3;
+}
+
+message LogoutRequest {
+  string access_jti = 1;
+}
+
+service AuthService {
+  rpc SendCode(SendCodeRequest)    returns (SendCodeResponse);
+  rpc Login(LoginRequest)         returns (LoginResponse);
+  rpc LoginBySMS(SMSLoginRequest) returns (SMSLoginResponse);
+  rpc RefreshToken(RefreshRequest) returns (RefreshResponse);
+  rpc Logout(LogoutRequest)       returns (google.protobuf.Empty);
+}

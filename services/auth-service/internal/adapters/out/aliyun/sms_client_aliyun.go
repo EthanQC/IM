@@ -14,40 +14,30 @@ type AliyunSMSClient struct {
 	templateCode string
 }
 
-func NewAliyunSMSClient(region, accessKeyID, accessKeySecret, signName, templateCode string) (out.SMSClient, error) {
-	client, err := dysmsapi.NewClientWithAccessKey(
-		region,
-		accessKeyID,
-		accessKeySecret,
-	)
-
+func NewAliyunSMSClient(
+	region, accessKeyID, accessKeySecret, signName, templateCode string,
+) (out.SMSClient, error) {
+	client, err := dysmsapi.NewClientWithAccessKey(region, accessKeyID, accessKeySecret)
 	if err != nil {
-		return nil, fmt.Errorf("初始化 Aliyun 短信客户端失败：%w", err)
+		return nil, fmt.Errorf("初始化 Aliyun 短信客户端失败: %w", err)
 	}
-
-	return &AliyunSMSClient{
-		client:       client,
-		signName:     signName,
-		templateCode: templateCode,
-	}, nil
+	return &AliyunSMSClient{client: client, signName: signName, templateCode: templateCode}, nil
 }
 
 func (a *AliyunSMSClient) Send(ctx context.Context, phone string, code string) error {
-	request := dysmsapi.CreateSendSmsRequest()
-	request.Scheme = "https"
-	request.PhoneNumbers = phone
-	request.SignName = a.signName
-	request.TemplateCode = a.templateCode
-	request.TemplateParam = fmt.Sprintf(`{"code":"%s"}`, code)
+	req := dysmsapi.CreateSendSmsRequest()
+	req.Scheme = "https"
+	req.PhoneNumbers = phone
+	req.SignName = a.signName
+	req.TemplateCode = a.templateCode
+	req.TemplateParam = fmt.Sprintf(`{"code":"%s"}`, code)
 
-	resp, err := a.client.SendSms(request)
-
+	resp, err := a.client.SendSms(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("阿里云短信发送错误: %w", err)
 	}
 	if resp.Code != "OK" {
-		return fmt.Errorf("阿里云短信发送失败：%s - %s", resp.Code, resp.Message)
+		return fmt.Errorf("阿里云短信发送失败: %s - %s", resp.Code, resp.Message)
 	}
-
 	return nil
 }

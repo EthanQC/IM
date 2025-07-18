@@ -4,33 +4,48 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/EthanQC/IM/services/auth-service/internal/domain/vo"
 	"github.com/EthanQC/IM/services/auth-service/internal/ports/out"
 	"github.com/EthanQC/IM/services/auth-service/pkg/errors"
 )
 
 type VerifyCodeUseCase struct {
-	authCodeRepo out.AuthCodeRepository
+	AuthCodeRepo out.AuthCodeRepository
+	MaxAttempts  int
 }
 
-// NewVerifyCodeUseCase 创建验证码校验用例
-func NewVerifyCodeUseCase(repo out.AuthCodeRepository) *VerifyCodeUseCase {
-	return &VerifyCodeUseCase{authCodeRepo: repo}
-}
-
-// Execute 校验输入的 code 是否与存储值一致，成功后删除
-func (uc *VerifyCodeUseCase) Execute(ctx context.Context, phone, code string) error {
-	stored, err := uc.authCodeRepo.Find(ctx, phone)
-	if err != nil {
-		return fmt.Errorf("get code: %w", err)
+func NewVerifyCodeUseCase(repo out.AuthCodeRepository, maxAttempts int) *VerifyCodeUseCase {
+	return &VerifyCodeUseCase{
+		AuthCodeRepo: repo,
+		MaxAttempts:  maxAttempts,
 	}
+}
 
-	if stored.Code != code {
+// Execute 校验验证码：存在→未过期→未超限→匹配→删除
+func (uc *VerifyCodeUseCase) Execute(ctx context.Context, phone vo.Phone, code string) error {
+	stored, err := uc.AuthCodeRepo.Find(ctx, phone.Number)
+	if err != nil {
+		return fmt.Errorf("获取验证码失败: %w", err)
+	}
+	if stored == nil {
+		return errors.ErrCodeNotFound
+	}
+	if stored.IsExpired() {
+		// 过期直接删除
+		_ = uc.AuthCodeRepo.Delete(ctx, phone.Number)
 		return errors.ErrCodeExpired
 	}
-
-	if err := uc.authCodeRepo.Delete(ctx, phone); err != nil {
-		return fmt.Errorf("delete code: %w", err)
+	if stored.AttemptCnt >= uc.MaxAttempts {
+		return errors.ErrTooManyAttempts
 	}
-
+	if stored.Code != code {
+		// 累计一次失败
+		_ = uc.AuthCodeRepo.IncrementAttempts(ctx, phone.Number)
+		return errors.ErrCodeInvalid
+	}
+	// 成功后删除
+	if err := uc.AuthCodeRepo.Delete(ctx, phone.Number); err != nil {
+		return fmt.Errorf("删除验证码失败: %w", err)
+	}
 	return nil
 }

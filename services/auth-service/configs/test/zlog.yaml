@@ -1,0 +1,12 @@
+log:
+  service: "auth-service"  # 服务名称
+  level: "info"           # 日志级别
+  encoding: "json"        # 编码格式
+  stdout: true           # 是否输出到控制台
+  file:
+    path: "IM/services/auth-service/logs/app.log" # 日志文件路径
+    max_size_mb: 100    # 单个文件大小限制
+    max_backups: 30     # 保留的旧文件个数
+    max_age_day: 7      # 日志保留天数
+    compress: true      # 是否压缩
+  enable_metric: false    # 是否启用监控指标

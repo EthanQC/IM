@@ -22,51 +22,43 @@ func NewAuthCodeRepoRedis(client *redis.Client, ttl time.Duration) out.AuthCodeR
 
 func (r *AuthCodeRepoRedis) Save(ctx context.Context, code *entity.AuthCode) error {
 	key := fmt.Sprintf("sms_code:%s", code.Phone)
-	b, _ := json.Marshal(code) // 序列化整个实体
-
+	b, err := json.Marshal(code)
+	if err != nil {
+		return fmt.Errorf("序列化验证码失败: %w", err)
+	}
 	return r.client.Set(ctx, key, b, r.ttl).Err()
 }
 
 func (r *AuthCodeRepoRedis) Find(ctx context.Context, phone string) (*entity.AuthCode, error) {
 	key := fmt.Sprintf("sms_code:%s", phone)
 	data, err := r.client.Get(ctx, key).Bytes()
-
 	if err == redis.Nil {
 		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var code entity.AuthCode
-	if err := json.Unmarshal(data, &code); err != nil {
-		return nil, err
+	} else if err != nil {
+		return nil, fmt.Errorf("读取验证码失败: %w", err)
 	}
 
-	return &code, nil
+	var ac entity.AuthCode
+	if err := json.Unmarshal(data, &ac); err != nil {
+		return nil, fmt.Errorf("反序列化验证码失败: %w", err)
+	}
+	return &ac, nil
 }
 
 func (r *AuthCodeRepoRedis) Delete(ctx context.Context, phone string) error {
 	key := fmt.Sprintf("sms_code:%s", phone)
-
 	return r.client.Del(ctx, key).Err()
 }
 
 func (r *AuthCodeRepoRedis) IncrementAttempts(ctx context.Context, phone string) error {
-	key := fmt.Sprintf("sms_code:%s", phone)
-	data, err := r.client.Get(ctx, key).Bytes()
-
+	ac, err := r.Find(ctx, phone)
 	if err != nil {
 		return err
 	}
-
-	var code entity.AuthCode
-	if err := json.Unmarshal(data, &code); err != nil {
-		return err
+	if ac == nil {
+		return nil
 	}
-
-	code.AttemptCnt++
-	b, _ := json.Marshal(&code)
-
-	return r.client.Set(ctx, key, b, r.ttl).Err()
+	ac.AttemptCnt++
+	// 保持原 TTL
+	return r.Save(ctx, ac)
 }
