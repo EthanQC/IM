@@ -24,7 +24,8 @@ func NewGenerateTokenUseCase(
 	refreshRepo out.RefreshTokenRepository,
 	statusRepo out.UserStatusRepository,
 	jwtMgr jwt.Manager,
-	accessTTL, refreshTTL time.Duration,
+	accessTTL,
+	refreshTTL time.Duration,
 ) *GenerateTokenUseCase {
 	return &GenerateTokenUseCase{
 		RefreshRepo: refreshRepo,

@@ -15,9 +15,9 @@ type AccessTokenRepoRedis struct {
 	blackListTTL time.Duration
 }
 
-func NewAccessTokenRepoRedis(client redis.Client, blackListTTL time.Duration) out.AccessTokenRepository {
+func NewAccessTokenRepoRedis(client *redis.Client, blackListTTL time.Duration) out.AccessTokenRepository {
 	return &AccessTokenRepoRedis{
-		client:       &client,
+		client:       client,
 		blackListTTL: blackListTTL,
 	}
 }
