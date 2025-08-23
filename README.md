@@ -200,7 +200,8 @@ IM/                                   # Monorepo 根目录
   * DDD 六边形
   * 微服务
 * 前端
-  * Vue3、Vue Router、Vuex、WebSocket、Element - UI 
+  * Vue 3 + Vite + TypeScript + Pinia
+  * Vue Router + Element Plus + TailwindCSS
 * 后端
   * Go
     * Gin
@@ -216,45 +217,84 @@ IM/                                   # Monorepo 根目录
   * gRPC
   * protobuf
   * Kafka
-* 部署
+* 工程化与运维
   * Docker
   * k8s（Kubernetes）
   * Github Actions
-* 监控告警
-  * OpenTelemetry
-  * Prometheus
-  * Grafana
-  * Alertmanager
+  * 监控告警
+    * OpenTelemetry
+    * Prometheus
+    * Grafana
+    * Alertmanager
 
-## 用户服务
+## api-gateway
+IM 对外唯一入口，REST + WebSocket
 
+负责：
+* TLS/SSL、JWT 校验、限流、CORS、统一错误与日志（Zap），承载 WebSocket 长连（握手/心跳/断线重连）
+* 把外部请求转发到内部 gRPC 服务；把 delivery 的“推送”发到对应的 WS 连接
 
+## identity-service
+认证 + 用户 + 联系人
 
-## 认证服务
+负责：
+* 账号
+  * 注册/登录/登出、签发/续期/校验 JWT；黑白名单（封禁用户、白名单路由）
+* 查看/更新用户资料
+* 联系人/好友
+  * 申请、同意/拒绝、删除、拉黑；被拉黑不允许建会话/发送消息
+* Casbin 管控接口权限（支持正则），策略变更实时生效
 
+## conversation-service
+会话/成员；单聊和群聊统一
 
+负责：
+* 创建/查询会话；成员增删；角色/禁言；会话属性（标题、头像、置顶）
+* 校验“创建会话是否允许”（比如是否被拉黑）
 
-## 聊天服务
-支持一对一私密聊天和群组聊天，消息实时推送
+## message-service
+消息写入/历史/已读；生产 Kafka
 
-* 单聊
-* 群聊
+负责：
+* 发消息
+  * 生成会话内 seq、按 clientMsgId 幂等、同事务写 messages + outbox，并写入 Kafka im.messages（key=conversation_id，保证会话内顺序）
+* 历史
+  * GET /messages?conv_id&since_seq&limit（按 (conv_id, seq) 翻页）
+* 已读
+  * 更新 inbox.last_read_seq
+* 文件消息
+  * 与 file-service 配合，消息体只存对象键/尺寸/MIME
 
-## 群组服务
+## delivery-service
+消息分发/离线/重试/死信；消费 Kafka
 
+负责：
+* 从 im.messages 消费消息；查询 presence 得到在线成员在哪个网关节点
+* 在线：通过网关把消息推送到对应 WS
+* 离线：更新 inbox.last_delivered_seq，用户上线后按 seq 回放
+* 失败重试（指数退避）；超限进 DLQ；对“热会话”做限速，防止推送风暴
 
+## presence-service
+在线状态/路由，支撑推送
 
-## 文件服务
+负责：
+* 记录：用户在哪个网关节点、最后心跳时间；提供“是否在线/最后活跃时间”的查询
+* 供 delivery 使用，找到要推送到哪个网关；将来可做“typing/在线列表”
 
+## media-signal-service
+音视频信令
 
+负责：
+* 1v1 通话的信令：发起/接受/拒绝/挂断；SDP/ICE 的转发；校验双方是否有共同会话（向 conversation 查询）
+* 统计：发起成功率、ICE 失败率、TURN 占比
 
-## 后台服务
+## file-service
+文件/图片/语音视频切片上传
 
-
-
-
-
-
+负责：
+* 生成 S3/MinIO 预签名 URL（支持分片/断点续传/tus 可选），上传走对象存储，不压后台带宽
+* 上传完成回调 message-service 写入一条“文件消息”（只存对象键与元数据）
+* 基本图片缩略图（可选）、类型白名单、大小上限；（选配）ClamAV 简单扫描
 
 
 1. 即时通讯功能
@@ -270,10 +310,14 @@ IM/                                   # Monorepo 根目录
 8. redis缓存：使用 GoRedis 进行缓存操作，提高系统性能。
 9. WebSocket：使用 WebSocket 实现实时消息推送，保证消息的实时性。
 
+
+
 二、技术需求
+
 （一）注册中心集成
 1. 服务注册与发现
   - 该服务能够与注册中心（如 Consul、Nacos 、etcd 等）进行集成，自动注册服务数据。
+
 （二）身份认证
 1. 登录认证
   - 可以使用第三方现成的登录验证框架（CasBin、Satoken等），对请求进行身份验证
@@ -283,15 +327,18 @@ IM/                                   # Monorepo 根目录
   - 根据用户的角色和权限，对请求进行授权检查，确保只有具有相应权限的用户能够访问特定的服务或接口。
   - 支持正则表达模式的权限匹配（加分项）
   - 支持动态更新用户权限信息，当用户权限发生变化时，权限校验能够实时生效。
+
 （三）可观测要求
 1. 日志记录与监控
   - 对服务的运行状态和请求处理过程进行详细的日志记录，方便故障排查和性能分析。
   - 提供实时监控功能，能够及时发现和解决系统中的问题。
+
 （四）可靠性要求（高级）
 1. 容错机制
   - 该服务应具备一定的容错能力，当出现部分下游服务不可用或网络故障时，能够自动切换到备用服务或进行降级处理。
   - 保证下游在异常情况下，系统的整体可用性不会受太大影响，且核心服务可用。
   - 服务应该具有一定的流量兜底措施，在服务流量激增时，应该给予一定的限流措施。
+
 三、功能需求
 认证中心
 - 分发身份令牌
@@ -305,25 +352,3 @@ IM/                                   # Monorepo 根目录
 - 删除用户（可选）
 - 更新用户（可选）
 - 获取用户身份信息
-商品服务
-- 创建商品（可选）
-- 修改商品信息（可选）
-- 删除商品（可选）
-- 查询商品信息（单个商品、批量商品）
-购物车服务
-- 创建购物车
-- 清空购物车
-- 获取购物车信息
-订单服务
-- 创建订单
-- 修改订单信息（可选）
-- 订单定时取消（高级）
-结算
-- 订单结算
-支付
-- 取消支付（高级）
-- 定时取消支付（高级）
-- 支付
-AI大模型
-- 订单查询
-- 模拟自动下单
