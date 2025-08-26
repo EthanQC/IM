@@ -1,0 +1,35 @@
+syntax = "proto3";
+package im.v1;
+option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
+
+
+import "proto/common.proto";
+
+
+service FileService {
+// 申请上传（返回预签名URL/对象键）
+rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse);
+// MinIO/S3 回调或客户端确认完成，转成一条文件消息由 message 服务分发
+rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+}
+
+
+message CreateUploadRequest {
+string filename = 1;
+string content_type = 2;
+int64 size_bytes = 3;
+string kind = 4; // image|file|audio|video
+}
+message CreateUploadResponse {
+string object_key = 1;
+string upload_url = 2; // 预签名 PUT 地址
+string callback_url = 3; // 可选
+}
+
+
+message CompleteUploadRequest {
+int64 conversation_id = 1;
+string client_msg_id = 2; // 与消息幂等一致
+MediaRef media = 3; // 上传完成后的引用（object_key/size/mime/...）
+}
+message CompleteUploadResponse { MessageItem message = 1; }

@@ -1,0 +1,42 @@
+syntax = "proto3";
+package im.v1;
+option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
+
+
+import "google/protobuf/timestamp.proto";
+import "proto/common.proto";
+
+
+service MessageService {
+// 同步写入：生成 seq，幂等（client_msg_id），写 messages + outbox，并产出 Kafka
+rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+// 已读上报
+rpc UpdateRead(UpdateReadRequest) returns (Empty);
+}
+
+
+message SendMessageRequest {
+int64 conversation_id = 1;
+string client_msg_id = 2; // 幂等键
+MessageContentType content_type = 3;
+MessageBody body = 4; // 文本/文件引用/音视频引用
+}
+
+
+message SendMessageResponse {
+MessageItem message = 1; // 包含服务端生成的 id/seq
+}
+
+
+message GetHistoryRequest {
+int64 conversation_id = 1;
+int64 after_seq = 2; // 从哪个 seq 之后开始（0 表示从头）
+int32 limit = 3; // 每页条数
+}
+
+
+message GetHistoryResponse { repeated MessageItem items = 1; }
+
+
+message UpdateReadRequest { int64 conversation_id = 1; int64 read_seq = 2; }

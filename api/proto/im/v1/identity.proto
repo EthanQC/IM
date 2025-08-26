@@ -1,0 +1,58 @@
+syntax = "proto3";
+package im.v1;
+option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
+
+
+import "google/protobuf/timestamp.proto";
+import "proto/common.proto";
+
+
+service IdentityService {
+rpc Register(RegisterRequest) returns (AuthResponse);
+rpc Login(LoginRequest) returns (AuthResponse);
+rpc Refresh(RefreshRequest) returns (AuthResponse);
+
+
+rpc GetProfile(GetProfileRequest) returns (UserProfile);
+rpc UpdateProfile(UpdateProfileRequest) returns (UserProfile);
+
+
+// 联系人/好友
+rpc ApplyContact(ApplyContactRequest) returns (Empty);
+rpc RespondContact(RespondContactRequest) returns (Empty); // 同意/拒绝
+rpc RemoveContact(RemoveContactRequest) returns (Empty);
+rpc AddToBlacklist(BlacklistRequest) returns (Empty);
+rpc RemoveFromBlacklist(BlacklistRequest) returns (Empty);
+rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
+}
+
+
+message RegisterRequest { string username = 1; string password = 2; string display_name = 3; }
+message LoginRequest { string username = 1; string password = 2; }
+message RefreshRequest { string refresh_token = 1; }
+
+
+message AuthResponse {
+string access_token = 1; // JWT
+int64 expires_in = 2; // 秒
+string refresh_token = 3; // 可选
+UserProfile profile = 4;
+}
+
+
+message GetProfileRequest { int64 user_id = 1; } // 为空=当前用户
+message UpdateProfileRequest { string display_name = 1; string avatar_url = 2; }
+
+
+message UserProfile { UserBrief user = 1; string status = 2; }
+
+
+// 联系人相关
+message ApplyContactRequest { int64 target_user_id = 1; string remark = 2; }
+message RespondContactRequest { int64 target_user_id = 1; bool accept = 2; }
+message RemoveContactRequest { int64 target_user_id = 1; }
+message BlacklistRequest { int64 user_id = 1; }
+
+
+message ListContactsRequest { int32 page = 1; int32 page_size = 2; }
+message ListContactsResponse { repeated UserBrief contacts = 1; int32 total = 2; }

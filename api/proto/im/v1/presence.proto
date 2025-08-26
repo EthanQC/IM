@@ -1,0 +1,21 @@
+syntax = "proto3";
+package im.v1;
+option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
+
+
+service PresenceService {
+rpc ReportOnline(ReportOnlineRequest) returns (Empty); // 网关在握手成功时调用
+rpc ReportOffline(ReportOfflineRequest) returns (Empty); // 断开时调用
+rpc GetOnline(GetOnlineRequest) returns (GetOnlineResponse);
+}
+
+
+message ReportOnlineRequest { int64 user_id = 1; string node_id = 2; }
+message ReportOfflineRequest { int64 user_id = 1; string node_id = 2; }
+message GetOnlineRequest { repeated int64 user_ids = 1; }
+
+
+message GetOnlineResponse {
+message Item { int64 user_id = 1; bool online = 2; string node_id = 3; int64 last_seen_unix = 4; }
+repeated Item items = 1;
+}

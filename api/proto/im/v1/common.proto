@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+
+// 消息内容类型
+enum MessageContentType {
+MESSAGE_CONTENT_TYPE_UNSPECIFIED = 0;
+MESSAGE_CONTENT_TYPE_TEXT = 1;
+MESSAGE_CONTENT_TYPE_IMAGE = 2;
+MESSAGE_CONTENT_TYPE_FILE = 3;
+MESSAGE_CONTENT_TYPE_AUDIO = 4;
+MESSAGE_CONTENT_TYPE_VIDEO = 5;
+// 将呼叫事件也当作一种消息，便于离线可见
+MESSAGE_CONTENT_TYPE_CALL_INVITE = 6;
+MESSAGE_CONTENT_TYPE_CALL_ACCEPT = 7;
+MESSAGE_CONTENT_TYPE_CALL_REJECT = 8;
+MESSAGE_CONTENT_TYPE_CALL_END = 9;
+}
+
+
+message Empty {}
+
+
+message UserBrief {
+int64 id = 1;
+string username = 2;
+string display_name = 3;
+string avatar_url = 4;
+}
+
+
+message ConversationBrief {
+int64 id = 1;
+ConversationType type = 2;
+string title = 3;
+}
+
+
+// 媒体/文件元信息
+message MediaRef {
+string object_key = 1; // 在 MinIO/S3 的对象键
+string filename = 2;
+string content_type = 3; // MIME
+int64 size_bytes = 4;
+int32 duration_sec = 5; // 音/视频可选
+string thumbnail_key = 6; // 图片/视频缩略图（可选）
+}
+
+
+message TextBody { string text = 1; }
+message CallBody { string convo_hint = 1; /* 可存业务侧提示，如房间号 */ }
+
+
+message MessageBody {
+oneof body {
+TextBody text = 1;
+MediaRef image = 2;
+MediaRef file = 3;
+MediaRef audio = 4;
+MediaRef video = 5;
+CallBody call = 6; // 呼叫事件
+}
+}
+
+
+message MessageItem {
+int64 id = 1;
+int64 conversation_id = 2;
+int64 sender_id = 3;
+int64 seq = 4; // 会话内自增序号
+MessageContentType content_type = 5;
+MessageBody body = 6;
+google.protobuf.Timestamp create_time = 7;
+}
