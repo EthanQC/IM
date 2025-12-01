@@ -4,6 +4,6 @@ use (
 	.
 	./pkg/zlog
 	./services/auth-service
-	./services/chat-service
-	./services/user-service
+	./services/message-service
+	./services/delivery-service
 )

@@ -19,11 +19,11 @@ import (
 	grpcAdapter "github.com/EthanQC/IM/services/auth-service/internal/adapters/in/gRPC"
 	httpAdapter "github.com/EthanQC/IM/services/auth-service/internal/adapters/in/http"
 	aliyunSms "github.com/EthanQC/IM/services/auth-service/internal/adapters/out/aliyun"
-	kafkaPub "github.com/EthanQC/IM/services/auth-service/internal/adapters/out/kafka"
 	mysqlRepo "github.com/EthanQC/IM/services/auth-service/internal/adapters/out/mysql"
 	redisRepo "github.com/EthanQC/IM/services/auth-service/internal/adapters/out/redis"
 	authApp "github.com/EthanQC/IM/services/auth-service/internal/application/auth"
 	smsApp "github.com/EthanQC/IM/services/auth-service/internal/application/sms"
+	statusApp "github.com/EthanQC/IM/services/auth-service/internal/application/status"
 	"github.com/EthanQC/IM/services/auth-service/pkg/jwt"
 )
 
@@ -118,10 +118,10 @@ func main() {
 	smsVerifyUC := smsApp.NewVerifyCodeUseCase(authCodeRepo, cfg.Code.MaxAttempts)
 	smsSendUC := smsApp.NewSendCodeUseCase(authCodeRepo, smsClient, cfg.Code.TTL)
 
-	// Kafka 发布者
+	// Kafka 发布者（预留事件用）
 	writer := kafka.NewWriter(kafka.WriterConfig{Brokers: cfg.Kafka.Brokers, Topic: cfg.Kafka.Topic})
 	defer writer.Close()
-	eventPublisher := kafkaPub.NewKafkaPublisher(writer)
+	_ = writer // 仅示意，事件发布后续接入
 
 	// 认证用例
 	genUC := authApp.NewGenerateTokenUseCase(
@@ -139,14 +139,18 @@ func main() {
 		cfg.JWT.RefreshTTL,
 	)
 	revokeUC := authApp.NewRevokeTokenUseCase(accessTokenRepo, refreshTokenRepo)
-
-	// 启动 HTTP 服务
-	mux := http.NewServeMux()
-	httpAdapter.NewAuthHandler(
+	statusUC := statusApp.NewCheckUserStatusUseCase(userStatusRepo)
+	authUC := authApp.NewDefaultAuthUseCase(
 		genUC,
 		refreshUC,
 		revokeUC,
-	).RegisterRoutes(mux)
+		statusUC,
+		smsVerifyUC,
+	)
+
+	// 启动 HTTP 服务
+	mux := http.NewServeMux()
+	httpAdapter.NewAuthHandler(authUC).RegisterRoutes(mux)
 
 	httpAdapter.NewSMSHandler(
 		smsSendUC,
@@ -167,9 +171,7 @@ func main() {
 	}
 	grpcServer := grpc.NewServer()
 	grpcAdapter.NewAuthServer(
-		genUC,
-		refreshUC,
-		revokeUC,
+		authUC,
 		smsSendUC,
 	).Register(grpcServer)
 	log.Printf("gRPC 服务启动: %s", grpcAddr)
