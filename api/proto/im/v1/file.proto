@@ -3,7 +3,7 @@ package im.v1;
 option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
 
 
-import "proto/common.proto";
+import "im/v1/common.proto";
 
 
 service FileService {

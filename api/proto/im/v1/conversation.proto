@@ -2,41 +2,29 @@ syntax = "proto3";
 package im.v1;
 option go_package = "github.com/EthanQC/IM/api/gen/im/v1;imv1";
 
-
-import "proto/common.proto";
-
+import "google/protobuf/empty.proto";
+import "im/v1/common.proto";
 
 service ConversationService {
-rpc CreateConversation(CreateConversationRequest) returns (ConversationBrief);
-rpc UpdateConversation(UpdateConversationRequest) returns (ConversationBrief);
+  rpc CreateConversation(CreateConversationRequest) returns (ConversationBrief);
+  rpc UpdateConversation(UpdateConversationRequest) returns (ConversationBrief);
 
+  rpc AddMembers(AddMembersRequest) returns (google.protobuf.Empty);
+  rpc RemoveMembers(RemoveMembersRequest) returns (google.protobuf.Empty);
+  rpc GetMembers(GetMembersRequest) returns (GetMembersResponse);
 
-rpc AddMembers(AddMembersRequest) returns (Empty);
-rpc RemoveMembers(RemoveMembersRequest) returns (Empty);
-rpc GetMembers(GetMembersRequest) returns (GetMembersResponse);
-
-
-rpc ListMyConversations(ListMyConversationsRequest) returns (ListMyConversationsResponse);
+  rpc ListMyConversations(ListMyConversationsRequest) returns (ListMyConversationsResponse);
 }
-
 
 message CreateConversationRequest {
-ConversationType type = 1; // single|group
-string title = 2; // group 可选
-repeated int64 member_ids = 3; // single: 目标用户ID；group: 初始成员
+  ConversationType type = 1;
+  string title = 2;
+  repeated int64 member_ids = 3;
 }
-
-
 message UpdateConversationRequest { int64 conversation_id = 1; string title = 2; }
-
-
 message AddMembersRequest { int64 conversation_id = 1; repeated int64 user_ids = 2; }
 message RemoveMembersRequest { int64 conversation_id = 1; repeated int64 user_ids = 2; }
 message GetMembersRequest { int64 conversation_id = 1; }
-
-
 message GetMembersResponse { repeated UserBrief members = 1; }
-
-
 message ListMyConversationsRequest { int32 page = 1; int32 page_size = 2; }
 message ListMyConversationsResponse { repeated ConversationBrief items = 1; int32 total = 2; }
