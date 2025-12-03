@@ -3,7 +3,8 @@ go 1.24.2
 use (
 	.
 	./pkg/zlog
-	./services/auth-service
-	./services/message-service
-	./services/delivery-service
+	./services/api_gateway
+	./services/delivery_service
+	./services/identity_service
+	./services/message_service
 )

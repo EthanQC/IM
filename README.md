@@ -1,317 +1,153 @@
-# IM
-## 简介
-本项目**前后端分离**，通过用户、认证、聊天、群组、文件、后台共六个微服务部署在云端服务器，每个微服务均采用 **DDD 六边形架构**，具备**单聊群聊、联系人管理、多种消息处理（文本/文件/视频）、离线消息处理、文件共享、音视频通话和后台管理**等功能
+# Instant Messaging
+本项目是**基于微服务架构的即时通讯系统**，采用 **DDD（领域驱动设计）+ 六边形架构**，支持下列功能：
 
-立即体验：（待部署后补充域名）
-
-## 文件目录
-
-```
-IM/                                   # Monorepo 根目录
-├── services/                         # 所有微服务
-│   ├── user-service/                 # 用户服务（边界上下文：User）
-│   │   ├── cmd/
-│   │   │   └── user-server/
-│   │   │       └── main.go           # 启动入口
-│   │   ├── internal/
-│   │   │   ├── domain/               # 领域层
-│   │   │   │   ├── entity/
-│   │   │   │   │   └── user.go       # User 实体
-│   │   │   │   ├── vo/
-│   │   │   │   │   └── email.go      # Email 值对象
-│   │   │   │   └── service/
-│   │   │   │       └── user_domain_service.go  # 跨实体业务（如密码重置）
-│   │   │   ├── application/          # 应用层（用例编排）
-│   │   │   │   ├── register_user.go
-│   │   │   │   └── login_user.go
-│   │   │   ├── ports/                # 端口层（接口定义）
-│   │   │   │   ├── in/
-│   │   │   │   │   └── user_usecase.go         # RegisterUserUseCase, LoginUseCase
-│   │   │   │   └── out/
-│   │   │   │       ├── user_repository.go     # UserRepo 接口
-│   │   │   │       └── auth_service.go        # TokenService 接口
-│   │   │   └── adapters/             # 适配器层（具体实现）
-│   │   │       ├── in/
-│   │   │       │   ├── http/
-│   │   │       │   │   └── user_controller.go
-│   │   │       │   └── grpc/
-│   │   │       │       └── user_grpc.go
-│   │   │       └── out/
-│   │   │           ├── db/
-│   │   │           │   └── gorm_user_repo.go
-│   │   │           └── auth/
-│   │   │               └── satoken_adapter.go
-│   │   ├── configs/
-│   │   │   ├── config.dev.yaml
-│   │   │   ├── config.test.yaml
-│   │   │   └── config.prod.yaml
-│   │   ├── Dockerfile
-│   │   └── go.mod
-│   │
-│   ├── chat-service/                 # 聊天服务（边界上下文：Chat）
-│   │   ├── cmd/chat-server/main.go
-│   │   ├── internal/
-│   │   │   ├── domain/
-│   │   │   │   ├── entity/
-│   │   │   │   │   └── message.go
-│   │   │   │   ├── vo/
-│   │   │   │   │   └── message_content.go
-│   │   │   │   └── service/
-│   │   │   │       └── chat_room_service.go    # 跨实体逻辑：群组广播
-│   │   │   ├── application/
-│   │   │   │   ├── send_message.go
-│   │   │   │   └── get_history.go
-│   │   │   ├── ports/
-│   │   │   │   ├── in/
-│   │   │   │   │   └── chat_usecase.go
-│   │   │   │   └── out/
-│   │   │   │       ├── message_repository.go
-│   │   │   │       └── event_publisher.go
-│   │   │   └── adapters/
-│   │   │       ├── in/
-│   │   │       │   ├── http/
-│   │   │       │   │   └── chat_controller.go
-│   │   │       │   └── ws/
-│   │   │       │       └── ws_adapter.go
-│   │   │       └── out/
-│   │   │           ├── db/
-│   │   │           │   └── gorm_message_repo.go
-│   │   │           └── mq/
-│   │   │               └── kafka_publisher.go
-│   │   ├── configs/
-│   │   │   ├── config.dev.yaml
-│   │   │   ├── config.test.yaml
-│   │   │   └── config.prod.yaml
-│   │   ├── Dockerfile
-│   │   └── go.mod
-│   │
-│   ├── group-service/               # 群组服务
-│   │   └── …
-│   │
-│   ├── file-service/                # 文件服务
-│   │
-│   ├── auth-service/                # 认证服务
-│   │   ├── cmd/
-│   │   │   └── auth-server/
-│   │   │       └── main.go                 # 服务启动入口
-│   │   ├── internal/
-│   │   │   ├── domain/                     # 领域层
-│   │   │   │   ├── entity/
-│   │   │   │   │   ├── auth_token.go      # Token实体
-│   │   │   │   │   └── auth_code.go       # 验证码实体  
-│   │   │   │   ├── vo/                    # 值对象
-│   │   │   │   │   ├── phone.go           # 手机号值对象
-│   │   │   │   │   └── password.go        # 密码值对象
-│   │   │   │   └── service/              
-│   │   │   │       └── auth_domain_service.go  # 领域服务
-│   │   │   │
-│   │   │   ├── application/               # 应用层 
-│   │   │   │   ├── auth/
-│   │   │   │   │   ├── generate_token.go  # Token生成用例
-│   │   │   │   │   ├── verify_token.go    # Token校验用例
-│   │   │   │   │   └── refresh_token.go   # Token刷新用例
-│   │   │   │   └── sms/
-│   │   │   │       ├── send_code.go       # 发送验证码用例
-│   │   │   │       └── verify_code.go     # 验证码校验用例
-│   │   │   │
-│   │   │   ├── ports/                     # 端口层
-│   │   │   │   ├── in/                    # 入站端口
-│   │   │   │   │   ├── auth_api.go        # 认证相关接口
-│   │   │   │   │   └── sms_api.go         # 短信相关接口
-│   │   │   │   └── out/                   # 出站端口
-│   │   │   │       ├── token_repo.go      # Token仓储接口
-│   │   │   │       └── sms_service.go     # 短信服务接口
-│   │   │   │
-│   │   │   └── adapters/                  # 适配器层
-│   │   │       ├── in/
-│   │   │       │   ├── http/              # HTTP适配器
-│   │   │       │   │   ├── auth_handler.go
-│   │   │       │   │   └── sms_handler.go
-│   │   │       │   └── grpc/              # gRPC适配器
-│   │   │       │       └── auth_server.go  
-│   │   │       └── out/
-│   │   │           ├── redis/             # Redis适配器
-│   │   │           │   └── token_repo_impl.go
-│   │   │           └── aliyun/            # 阿里云短信适配器
-│   │   │               └── sms_service_impl.go
-│   │   │
-│   │   ├── configs/                        # 配置文件
-│   │   │   ├── config.dev.yaml
-│   │   │   ├── config.test.yaml  
-│   │   │   └── config.prod.yaml
-│   │   │
-│   │   ├── api/                           # API定义
-│   │   │   └── proto/
-│   │   │       └── auth.proto
-│   │   │
-│   │   ├── pkg/                           # 工具包
-│   │   │   ├── jwt/
-│   │   │   │   └── jwt.go
-│   │   │   └── errors/
-│   │   │       └── auth_errors.go
-│   │   │
-│   │   ├── Dockerfile                    
-│   │   └── go.mod
-│   │
-│   └── notification-service/        # 通知服务
-│
-├── pkg/                              # 跨服务共享库
-│   ├── logger/                       # 日志封装
-│   │   ├── config.go       # 日志配置结构
-│   │   ├── core.go         # 日志核心实现
-│   │   ├── ctx.go          # 上下文相关
-│   │   ├── global.go       # 全局实例相关
-│   │   ├── level.go        # 日志级别相关
-│   │   ├── metrics.go      # Prometheus 指标收集
-│   │   ├── middleware.go   # 中间件相关
-│   │   ├── readme.md       # 日志模块使用介绍
-│   │   └── writer.go       # 日志输出管理
-│
-├── charts/                           # Helm Charts 或 Kustomize
-│   ├── user-service/
-│   ├── chat-service/
-│   └── group-service/
-│
-├── scripts/
-│   ├── docker-compose.yml            # 本地一键跑通所有依赖和服务
-│   ├── dev-run.sh                    # Shell 脚本并行启动多个 main.go
-│   └── k8s/
-│       ├── dev/
-│       ├── test/
-│       └── prod/
-│
-├── docs/
-│   ├── context-map.md                # 上下文图
-│   ├── domain-model.png              # 领域模型图
-│   ├── api-spec.md                   # 接口文档
-│   └── architecture-overview.md      # 架构总览
-│
-├── config/
-│   ├── global-config.yaml            # 注册中心、网关、监控等全局配置
-│   └── registry-config.yaml
-│
-├── .gitignore
-└── README.md
-```
+* 单聊/群聊
+* 联系人管理
+* 多种消息类型（文本/文件/视频）
+* 离线消息处理
+* 文件共享
+* 音视频通话
 
 ## 技术栈
 
-* 架构
-  * DDD 六边形
-  * 微服务
-* 前端
-  * Vue 3 + Vite + TypeScript + Pinia
-  * Vue Router + Element Plus + TailwindCSS
 * 后端
-  * Go
-    * Gin
-    * GORM
+  * 语言
+    * Go 1.24.2
+    * Web 框架：Gin
+    * ORM：GORM
+    * go-redis
+  * 服务间通信
+    * 同步：gRPC
+    * 异步：Kafka（消息队列）
+  * 接口定义与代码生成
+    * protobuf
   * 数据库
     * MySQL
-    * Redis
+    * Redis（在线状态/缓存/限流）
   * 日志
-    * 基于 Zap 库封装的全局日志模块
-  * 音视频
-    * WebRTC
-  * WebSocket
-  * gRPC
-  * protobuf
-  * Kafka
-* 工程化与运维
-  * Docker
-  * k8s（Kubernetes）
-  * Github Actions
-  * 监控告警
-    * OpenTelemetry
-    * Prometheus
-    * Grafana
-    * Alertmanager
+    * zap
+  * 监测
+    * Prometheus + Grafana + Alertmanager + OpenTelemetry
+    * 或用夜莺等其他方案
+* 文件存储
+  * MinIO（本地对象存储，兼容 S3 API）
+* 音视频
+  * WebRTC
+  * 后端做信令、STUN/TURN 配置
+* 容器化与部署
+  * Docker 与 Docker Compose（本地开发）
+  * Kubernetes（生产）
+  * CI/CD：Github Actions
+* 前端
+  * Vue3 + Vite + TS
 
-## api-gateway
-IM 对外唯一入口，REST + WebSocket
+## 仓库目录
 
-负责：
-* TLS/SSL、JWT 校验、限流、CORS、统一错误与日志（Zap），承载 WebSocket 长连（握手/心跳/断线重连）
-* 把外部请求转发到内部 gRPC 服务；把 delivery 的“推送”发到对应的 WS 连接
-
-## identity-service
-认证 + 用户 + 联系人
-
-负责：
-* 账号
-  * 注册/登录/登出、签发/续期/校验 JWT；黑白名单（封禁用户、白名单路由）
-* 查看/更新用户资料
-* 联系人/好友
-  * 申请、同意/拒绝、删除、拉黑；被拉黑不允许建会话/发送消息
-* Casbin 管控接口权限（支持正则），策略变更实时生效
-
-## conversation-service
-会话/成员；单聊和群聊统一
-
-负责：
-* 创建/查询会话；成员增删；角色/禁言；会话属性（标题、头像、置顶）
-* 校验“创建会话是否允许”（比如是否被拉黑）
-
-## message-service
-消息写入/历史/已读；生产 Kafka
-
-负责：
-* 发消息
-  * 生成会话内 seq、按 clientMsgId 幂等、同事务写 messages + outbox，并写入 Kafka im.messages（key=conversation_id，保证会话内顺序）
-* 历史
-  * GET /messages?conv_id&since_seq&limit（按 (conv_id, seq) 翻页）
-* 已读
-  * 更新 inbox.last_read_seq
-* 文件消息
-  * 与 file-service 配合，消息体只存对象键/尺寸/MIME
-
-## delivery-service
-消息分发/离线/重试/死信；消费 Kafka
-
-负责：
-* 从 im.messages 消费消息；查询 presence 得到在线成员在哪个网关节点
-* 在线：通过网关把消息推送到对应 WS
-* 离线：更新 inbox.last_delivered_seq，用户上线后按 seq 回放
-* 失败重试（指数退避）；超限进 DLQ；对“热会话”做限速，防止推送风暴
-
-## presence-service
-在线状态/路由，支撑推送
-
-负责：
-* 记录：用户在哪个网关节点、最后心跳时间；提供“是否在线/最后活跃时间”的查询
-* 供 delivery 使用，找到要推送到哪个网关；将来可做“typing/在线列表”
-
-## media-signal-service
-音视频信令
-
-负责：
-* 1v1 通话的信令：发起/接受/拒绝/挂断；SDP/ICE 的转发；校验双方是否有共同会话（向 conversation 查询）
-* 统计：发起成功率、ICE 失败率、TURN 占比
-
-## file-service
-文件/图片/语音视频切片上传
-
-负责：
-* 生成 S3/MinIO 预签名 URL（支持分片/断点续传/tus 可选），上传走对象存储，不压后台带宽
-* 上传完成回调 message-service 写入一条“文件消息”（只存对象键与元数据）
-* 基本图片缩略图（可选）、类型白名单、大小上限；（选配）ClamAV 简单扫描
+```
+IM/
+├── api/                          # 统一的 Proto 定义和生成代码
+│   ├── proto/im/v1/              # *.proto 源文件（唯一入口）
+│   │   ├── identity.proto        # 身份服务接口
+│   │   ├── conversation.proto    # 会话服务接口
+│   │   ├── message.proto         # 消息服务接口
+│   │   ├── presence.proto        # 在线状态接口
+│   │   ├── file.proto            # 文件服务接口
+│   │   └── common.proto          # 公共类型
+│   └── gen/im/v1/                # buf generate 生成的 Go 代码
+│
+├── services/                     # 微服务目录
+│   ├── api_gateway/              # HTTP/WS 网关
+│   ├── identity_service/         # 身份认证服务
+│   ├── conversation_service/     # 会话服务
+│   ├── message_service/          # 消息服务
+│   ├── delivery_service/         # 消息投递服务
+│   ├── presence-service/         # 在线状态服务
+│   ├── file_service/             # 文件服务
+│   └── media-signal-service/     # 音视频信令服务
+│
+├── pkg/                          # 跨服务共享库
+│   ├── zlog/                     # 基于 zap 的日志模块
+│   ├── constants/                # 常量定义
+│   ├── enum/                     # 枚举类型
+│   ├── util/                     # 工具函数
+│   └── ssl/                      # TLS 证书
+│
+├── deploy/                       # 部署配置
+│   ├── docker-compose.dev.yml    # 本地开发依赖
+│   └── sql/                      # 数据库初始化脚本
+│
+├── web/chat-server/              # 前端代码（Vue3 + Vite）
+├── KamaChat/                     # 参考代码快照（旧版单体）
+├── go.work                       # Go workspace 配置
+├── buf.yaml                      # buf lint/generate 配置
+└── README.md                  
+```
 
 
-1. 即时通讯功能
-   + 联系人管理：可添加、删除、拉黑联系人，处理好友申请等。
-   + 消息类型：支持文本、文件、音视频等多种类型消息的发送与接收。
-   + 离线消息处理：确保用户离线时消息不丢失，上线后可正常接收。
-2. 音视频通话：基于 WebRTC 实现 1 对 1 音视频通话，包括发起、拒绝、接收、挂断通话等功能。
-3. 后台管理：具备后台管理界面，靓号用户可进行人员管控等维护操作。
-4. 安全与验证：支持 SSL 加密，保障用户信息安全。
-5. 后台mysql数据库：使用 GORM 进行数据库操作，确保数据持久化存储。
-6. 日志记录：使用 Zap 日志库记录系统运行日志，便于问题排查与性能监控。
-7. 消息队列：使用 Kafka 处理消息队列，确保消息的高效传输与处理。
-8. redis缓存：使用 GoRedis 进行缓存操作，提高系统性能。
-9. WebSocket：使用 WebSocket 实现实时消息推送，保证消息的实时性。
+## 架构总览
+
+本项目采用前后端分离的 monorepo，通过 API-Gateway 作为对外的唯一入口网关，利用 DDD 对业务和技术需求做了拆分，已有身份、聊天、消息、投递、在线、音视频和文件共七个微服务
 
 
 
+
+
+#### api_gateway
+
+#### identity_service
+
+#### conversation_service
+
+#### message_service
+
+#### delivery_service
+
+#### presence_service
+
+#### media_signal_service
+
+#### file_service
+
+
+
+
+
+## 环境管理
+- 服务级配置：`services/<service>/configs/{env}/<service>.yaml`（示例：`identity_service/configs/dev/identity_service.yaml`）。包含端口、DB/Redis/Kafka/SMS/TTL 等。
+- 日志配置：各服务 `configs/{env}/zlog.yaml`。
+- 依赖编排：`deploy/docker-compose.dev.yml` 用于本地；生产建议按环境拆分 `deploy/k8s/{env}/`（预留）。
+- 秘钥/证书：生产放入密钥管理（K8s Secret/云 KMS），本地用 `.env` 或配置文件占位，不进版本库。
+
+## 快速开始（本地开发）
+1) 依赖：Go 1.24.2、buf CLI、Docker & Docker Compose。  
+2) 启动本地依赖：
+   ```bash
+   docker compose -f deploy/docker-compose.dev.yml up -d
+   ```
+   - MySQL root 密码：`imdev`，默认库 `identity_service`
+   - Redis: `localhost:6379`
+   - Kafka: `localhost:9092`（自动建 topic）
+   - MinIO: `localhost:9000` / Console `9001`（admin/admin123）
+3) 初始化数据库（identity_service 示例）：
+   ```bash
+   mysql -h 127.0.0.1 -u root -pimdev < services/identity_service/db/migrations/0001_init_tables.sql
+   ```
+4) 生成 proto（如网络可用）：`buf generate`。  
+5) 运行 identity_service MVP：
+   ```bash
+   cd services/identity_service
+   go run ./cmd/main.go -config ./configs/dev/identity_service.yaml
+   ```
+   - gRPC 默认 9090，HTTP 端口见配置。
+   - Register/联系人接口当前返回 Unimplemented；Login/Refresh 可用。
+6) 网关及其他服务：尚未落地，按「实现路线」逐步补齐（Conversation→Message→Delivery→Presence→File→Media-Signal）。
+
+
+
+
+
+
+## 其他需求
 二、技术需求
 
 （一）注册中心集成

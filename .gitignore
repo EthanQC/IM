@@ -90,3 +90,6 @@ dump.rdb
 # 测试数据库文件
 *.db
 *.sqlite
+
+
+.gocache/
