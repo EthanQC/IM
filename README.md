@@ -94,7 +94,9 @@ IM/
 
 #### api_gateway
 
+
 #### identity_service
+
 
 #### conversation_service
 
@@ -113,36 +115,15 @@ IM/
 
 
 ## 环境管理
-- 服务级配置：`services/<service>/configs/{env}/<service>.yaml`（示例：`identity_service/configs/dev/identity_service.yaml`）。包含端口、DB/Redis/Kafka/SMS/TTL 等。
-- 日志配置：各服务 `configs/{env}/zlog.yaml`。
-- 依赖编排：`deploy/docker-compose.dev.yml` 用于本地；生产建议按环境拆分 `deploy/k8s/{env}/`（预留）。
-- 秘钥/证书：生产放入密钥管理（K8s Secret/云 KMS），本地用 `.env` 或配置文件占位，不进版本库。
+
 
 ## 快速开始（本地开发）
-1) 依赖：Go 1.24.2、buf CLI、Docker & Docker Compose。  
-2) 启动本地依赖：
-   ```bash
-   docker compose -f deploy/docker-compose.dev.yml up -d
-   ```
-   - MySQL root 密码：`imdev`，默认库 `identity_service`
-   - Redis: `localhost:6379`
-   - Kafka: `localhost:9092`（自动建 topic）
-   - MinIO: `localhost:9000` / Console `9001`（admin/admin123）
-3) 初始化数据库（identity_service 示例）：
-   ```bash
-   mysql -h 127.0.0.1 -u root -pimdev < services/identity_service/db/migrations/0001_init_tables.sql
-   ```
-4) 生成 proto（如网络可用）：`buf generate`。  
-5) 运行 identity_service MVP：
-   ```bash
-   cd services/identity_service
-   go run ./cmd/main.go -config ./configs/dev/identity_service.yaml
-   ```
-   - gRPC 默认 9090，HTTP 端口见配置。
-   - Register/联系人接口当前返回 Unimplemented；Login/Refresh 可用。
-6) 网关及其他服务：尚未落地，按「实现路线」逐步补齐（Conversation→Message→Delivery→Presence→File→Media-Signal）。
 
+只启动 MySQL + Redis：
 
+```bash
+docker compose -f deploy/docker-compose.dev.yml up -d mysql redis
+```
 
 
 

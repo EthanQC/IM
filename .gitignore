@@ -61,10 +61,9 @@ vendor/
 logs/
 *.log
 
-# 配置文件(可能包含敏感信息)
-configs/dev/
-configs/prod/
+# 配置文件
 *.env
+*.yaml
 
 # 证书和密钥文件
 *.pem
