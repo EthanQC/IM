@@ -11,24 +11,21 @@ import (
 	"github.com/EthanQC/IM/services/file_service/internal/ports/out"
 )
 
-// FileModel 文件数据库模型
+// FileModel 文件数据库模型 - 匹配 attachments 表
 type FileModel struct {
-	ID          uint64    `gorm:"column:id;primaryKey;autoIncrement"`
-	UserID      uint64    `gorm:"column:user_id;not null;index"`
-	ObjectKey   string    `gorm:"column:object_key;type:varchar(512);not null;uniqueIndex"`
-	FileName    string    `gorm:"column:file_name;type:varchar(255);not null"`
-	ContentType string    `gorm:"column:content_type;type:varchar(128)"`
-	SizeBytes   int64     `gorm:"column:size_bytes;not null"`
-	Kind        string    `gorm:"column:kind;type:varchar(32);not null"`
-	Status      int8      `gorm:"column:status;default:0"`
-	Bucket      string    `gorm:"column:bucket;type:varchar(64);not null"`
-	URL         string    `gorm:"column:url;type:varchar(1024)"`
-	Thumbnail   string    `gorm:"column:thumbnail;type:varchar(1024)"`
-	Width       int32     `gorm:"column:width"`
-	Height      int32     `gorm:"column:height"`
-	Duration    int32     `gorm:"column:duration"`
-	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	ID           uint64    `gorm:"column:id;primaryKey;autoIncrement"`
+	ObjectKey    string    `gorm:"column:object_key;type:varchar(255);not null;uniqueIndex"`
+	OriginalName string    `gorm:"column:original_name;type:varchar(255);not null"`
+	UploaderID   uint64    `gorm:"column:uploader_id;not null;index"`
+	SizeBytes    int64     `gorm:"column:size_bytes;not null"`
+	ContentType  string    `gorm:"column:content_type;type:varchar(128);not null"`
+	MD5          string    `gorm:"column:md5;type:char(32)"`
+	Width        int32     `gorm:"column:width"`
+	Height       int32     `gorm:"column:height"`
+	Duration     int32     `gorm:"column:duration"`
+	Metadata     *string   `gorm:"column:metadata;type:json"`
+	Status       int8      `gorm:"column:status;default:1"`
+	CreatedAt    time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
 func (FileModel) TableName() string {
@@ -38,21 +35,16 @@ func (FileModel) TableName() string {
 func (m *FileModel) toEntity() *entity.FileUpload {
 	return &entity.FileUpload{
 		ID:          m.ID,
-		UserID:      m.UserID,
+		UserID:      m.UploaderID,
 		ObjectKey:   m.ObjectKey,
-		FileName:    m.FileName,
+		FileName:    m.OriginalName,
 		ContentType: m.ContentType,
 		SizeBytes:   m.SizeBytes,
-		Kind:        entity.FileKind(m.Kind),
 		Status:      entity.FileStatus(m.Status),
-		Bucket:      m.Bucket,
-		URL:         m.URL,
-		Thumbnail:   m.Thumbnail,
 		Width:       m.Width,
 		Height:      m.Height,
 		Duration:    m.Duration,
 		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
 	}
 }
 
@@ -67,14 +59,15 @@ func NewFileRepositoryMySQL(db *gorm.DB) out.FileRepository {
 
 func (r *FileRepositoryMySQL) Create(ctx context.Context, file *entity.FileUpload) error {
 	model := &FileModel{
-		UserID:      file.UserID,
-		ObjectKey:   file.ObjectKey,
-		FileName:    file.FileName,
-		ContentType: file.ContentType,
-		SizeBytes:   file.SizeBytes,
-		Kind:        string(file.Kind),
-		Status:      int8(file.Status),
-		Bucket:      file.Bucket,
+		ObjectKey:    file.ObjectKey,
+		OriginalName: file.FileName,
+		UploaderID:   file.UserID,
+		SizeBytes:    file.SizeBytes,
+		ContentType:  file.ContentType,
+		Status:       int8(file.Status),
+		Width:        file.Width,
+		Height:       file.Height,
+		Duration:     file.Duration,
 	}
 
 	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
@@ -83,7 +76,6 @@ func (r *FileRepositoryMySQL) Create(ctx context.Context, file *entity.FileUploa
 
 	file.ID = model.ID
 	file.CreatedAt = model.CreatedAt
-	file.UpdatedAt = model.UpdatedAt
 	return nil
 }
 

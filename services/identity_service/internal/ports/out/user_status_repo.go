@@ -7,6 +7,6 @@ import (
 )
 
 type UserStatusRepository interface {
-	Get(ctx context.Context, userID string) (*entity.UserStatus, error)
-	Save(ctx context.Context, s *entity.UserStatus) error
+	Get(ctx context.Context, userID string) (*entity.UserBlockStatus, error)
+	Save(ctx context.Context, s *entity.UserBlockStatus) error
 }

@@ -5,7 +5,10 @@ use (
 	./api
 	./pkg/zlog
 	./services/api_gateway
+	./services/conversation_service
 	./services/delivery_service
+	./services/file_service
 	./services/identity_service
 	./services/message_service
+	./services/presence_service
 )

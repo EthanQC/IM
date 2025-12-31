@@ -9,6 +9,7 @@ import (
 	"github.com/EthanQC/IM/services/conversation_service/internal/ports/in"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -183,13 +184,20 @@ func toConversationBrief(conv *entity.Conversation) *imv1.ConversationBrief {
 }
 
 func getUserIDFromContext(ctx context.Context) (uint64, error) {
-	userIDStr, ok := ctx.Value("user_id").(string)
+	// 从 gRPC metadata 中获取 user_id
+	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return 0, status.Errorf(codes.Unauthenticated, "user_id not found in context")
+		return 0, status.Errorf(codes.Unauthenticated, "missing metadata")
 	}
-	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+
+	userIDStrs := md.Get("user_id")
+	if len(userIDStrs) == 0 {
+		return 0, status.Errorf(codes.Unauthenticated, "user_id not found in metadata")
+	}
+
+	userID, err := strconv.ParseUint(userIDStrs[0], 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, status.Errorf(codes.InvalidArgument, "invalid user_id")
 	}
 	return userID, nil
 }

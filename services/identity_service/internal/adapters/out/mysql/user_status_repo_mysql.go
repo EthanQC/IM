@@ -16,8 +16,8 @@ func NewUserStatusRepoMysql(db *gorm.DB) out.UserStatusRepository {
 	return &UserStatusRepoMysql{db: db}
 }
 
-func (r *UserStatusRepoMysql) Get(ctx context.Context, userID string) (*entity.UserStatus, error) {
-	var s entity.UserStatus
+func (r *UserStatusRepoMysql) Get(ctx context.Context, userID string) (*entity.UserBlockStatus, error) {
+	var s entity.UserBlockStatus
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&s).Error
 
 	if err == gorm.ErrRecordNotFound {
@@ -27,6 +27,6 @@ func (r *UserStatusRepoMysql) Get(ctx context.Context, userID string) (*entity.U
 	return &s, err
 }
 
-func (r *UserStatusRepoMysql) Save(ctx context.Context, s *entity.UserStatus) error {
+func (r *UserStatusRepoMysql) Save(ctx context.Context, s *entity.UserBlockStatus) error {
 	return r.db.WithContext(ctx).Save(s).Error
 }

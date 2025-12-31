@@ -41,10 +41,10 @@ func NewKafkaEventPublisher(brokers []string) (out.EventPublisher, error) {
 	return &KafkaEventPublisher{producer: producer}, nil
 }
 
-func (p *KafkaEventPublisher) PublishNewMessage(ctx context.Context, event *out.NewMessageEvent) error {
+func (p *KafkaEventPublisher) PublishMessageSent(ctx context.Context, event *out.MessageSentEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("marshal new message event failed: %w", err)
+		return fmt.Errorf("marshal message sent event failed: %w", err)
 	}
 
 	msg := &sarama.ProducerMessage{
@@ -52,14 +52,14 @@ func (p *KafkaEventPublisher) PublishNewMessage(ctx context.Context, event *out.
 		Key:   sarama.StringEncoder(fmt.Sprintf("%d", event.ConversationID)), // 按会话分区
 		Value: sarama.ByteEncoder(data),
 		Headers: []sarama.RecordHeader{
-			{Key: []byte("event_type"), Value: []byte("new_message")},
+			{Key: []byte("event_type"), Value: []byte("message_sent")},
 			{Key: []byte("timestamp"), Value: []byte(time.Now().UTC().Format(time.RFC3339))},
 		},
 	}
 
 	_, _, err = p.producer.SendMessage(msg)
 	if err != nil {
-		return fmt.Errorf("publish new message event failed: %w", err)
+		return fmt.Errorf("publish message sent event failed: %w", err)
 	}
 
 	return nil

@@ -24,6 +24,7 @@ import (
 	authApp "github.com/EthanQC/IM/services/identity_service/internal/application/auth"
 	smsApp "github.com/EthanQC/IM/services/identity_service/internal/application/sms"
 	statusApp "github.com/EthanQC/IM/services/identity_service/internal/application/status"
+	userApp "github.com/EthanQC/IM/services/identity_service/internal/application/user"
 	"github.com/EthanQC/IM/services/identity_service/pkg/jwt"
 )
 
@@ -106,6 +107,10 @@ func main() {
 	accessTokenRepo := redisRepo.NewAccessTokenRepoRedis(rdb, cfg.JWT.AccessTTL)
 	refreshTokenRepo := mysqlRepo.NewRefreshTokenRepoMysql(db)
 	userStatusRepo := mysqlRepo.NewUserStatusRepoMysql(db)
+	userRepo := mysqlRepo.NewUserRepositoryMySQL(db)
+
+	// 用户用例
+	userUC := userApp.NewUserUseCaseImpl(userRepo, jwtMgr, nil)
 
 	// 短信服务用例
 	smsClient, _ := aliyunSms.NewAliyunSMSClient(
@@ -152,10 +157,7 @@ func main() {
 	mux := http.NewServeMux()
 	httpAdapter.NewAuthHandler(authUC).RegisterRoutes(mux)
 
-	httpAdapter.NewSMSHandler(
-		smsSendUC,
-		smsVerifyUC,
-	).RegisterRoutes(mux)
+	httpAdapter.NewSMSHandler(smsSendUC).RegisterRoutes(mux)
 
 	go func() {
 		log.Printf("HTTP 服务启动: %s", httpAddr)
@@ -172,8 +174,9 @@ func main() {
 	grpcServer := grpc.NewServer()
 	grpcAdapter.NewAuthServer(
 		authUC,
+		userUC,
 		smsSendUC,
-	).Register(grpcServer)
+	).RegisterServer(grpcServer)
 	log.Printf("gRPC 服务启动: %s", grpcAddr)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("gRPC 服务失败: %v", err)

@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -14,25 +16,25 @@ import (
 )
 
 var (
-	ErrUsernameTaken     = errors.New("username already taken")
-	ErrPhoneTaken        = errors.New("phone already taken")
-	ErrEmailTaken        = errors.New("email already taken")
+	ErrUsernameTaken      = errors.New("username already taken")
+	ErrPhoneTaken         = errors.New("phone already taken")
+	ErrEmailTaken         = errors.New("email already taken")
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound      = errors.New("user not found")
-	ErrUserInactive      = errors.New("user is inactive")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrUserInactive       = errors.New("user is inactive")
 )
 
 type UserUseCaseImpl struct {
-	userRepo    out.UserRepository
-	jwtManager  *jwt.Manager
-	eventPub    out.EventPublisher
+	userRepo   out.UserRepository
+	jwtManager jwt.Manager
+	eventPub   out.EventPublisher
 }
 
 var _ in.UserUseCase = (*UserUseCaseImpl)(nil)
 
 func NewUserUseCaseImpl(
 	userRepo out.UserRepository,
-	jwtManager *jwt.Manager,
+	jwtManager jwt.Manager,
 	eventPub out.EventPublisher,
 ) *UserUseCaseImpl {
 	return &UserUseCaseImpl{
@@ -102,7 +104,8 @@ func (uc *UserUseCaseImpl) Register(ctx context.Context, username, password, dis
 			"username":  user.Username,
 			"timestamp": user.CreatedAt,
 		}
-		_ = uc.eventPub.Publish(ctx, "user-events", event)
+		data, _ := json.Marshal(event)
+		_ = uc.eventPub.Publish(ctx, "user-events", fmt.Sprintf("%d", user.ID), data)
 	}
 
 	return user, nil
@@ -128,8 +131,8 @@ func (uc *UserUseCaseImpl) Login(ctx context.Context, username, password string)
 		return nil, "", ErrInvalidCredentials
 	}
 
-	// 生成JWT Token
-	token, err := uc.jwtManager.GenerateAccessToken(fmt.Sprintf("%d", user.ID), user.Username)
+	// 生成JWT Token (使用 Generate 方法，15分钟有效期)
+	token, err := uc.jwtManager.Generate(fmt.Sprintf("%d", user.ID), user.Username, 15*time.Minute)
 	if err != nil {
 		return nil, "", fmt.Errorf("generate token: %w", err)
 	}
@@ -142,7 +145,8 @@ func (uc *UserUseCaseImpl) Login(ctx context.Context, username, password string)
 			"username":  user.Username,
 			"timestamp": user.CreatedAt,
 		}
-		_ = uc.eventPub.Publish(ctx, "user-events", event)
+		data, _ := json.Marshal(event)
+		_ = uc.eventPub.Publish(ctx, "user-events", fmt.Sprintf("%d", user.ID), data)
 	}
 
 	return user, token, nil
@@ -182,7 +186,8 @@ func (uc *UserUseCaseImpl) UpdateProfile(ctx context.Context, userID uint64, dis
 			"display_name": user.DisplayName,
 			"timestamp":    user.UpdatedAt,
 		}
-		_ = uc.eventPub.Publish(ctx, "user-events", event)
+		data, _ := json.Marshal(event)
+		_ = uc.eventPub.Publish(ctx, "user-events", fmt.Sprintf("%d", user.ID), data)
 	}
 
 	return user, nil

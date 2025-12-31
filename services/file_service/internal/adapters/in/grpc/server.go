@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/EthanQC/IM/api/gen/im/v1"
@@ -28,12 +30,31 @@ func RegisterFileServiceServer(s *grpc.Server, srv *FileServer) {
 	pb.RegisterFileServiceServer(s, srv)
 }
 
+// getUserIDFromMetadata 从 gRPC metadata 获取 user_id
+func getUserIDFromMetadata(ctx context.Context) (uint64, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	userIDStrs := md.Get("user_id")
+	if len(userIDStrs) == 0 {
+		return 0, status.Error(codes.Unauthenticated, "user_id not found in metadata")
+	}
+
+	userID, err := strconv.ParseUint(userIDStrs[0], 10, 64)
+	if err != nil {
+		return 0, status.Error(codes.InvalidArgument, "invalid user_id")
+	}
+	return userID, nil
+}
+
 // CreateUpload 创建上传
 func (s *FileServer) CreateUpload(ctx context.Context, req *pb.CreateUploadRequest) (*pb.CreateUploadResponse, error) {
-	// 从context获取userID（需要在拦截器中设置）
-	userID := ctx.Value("user_id").(uint64)
-	if userID == 0 {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	// 从 metadata 获取 userID
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	kind := entity.FileKind(req.Kind)
@@ -61,9 +82,9 @@ func (s *FileServer) CreateUpload(ctx context.Context, req *pb.CreateUploadReque
 
 // CompleteUpload 完成上传
 func (s *FileServer) CompleteUpload(ctx context.Context, req *pb.CompleteUploadRequest) (*pb.CompleteUploadResponse, error) {
-	userID := ctx.Value("user_id").(uint64)
-	if userID == 0 {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Media == nil {
@@ -75,10 +96,10 @@ func (s *FileServer) CompleteUpload(ctx context.Context, req *pb.CompleteUploadR
 		ObjectKey:      req.Media.ObjectKey,
 		ConversationID: uint64(req.ConversationId),
 		ClientMsgID:    req.ClientMsgId,
-		Width:          req.Media.Width,
-		Height:         req.Media.Height,
-		Duration:       req.Media.Duration,
-		Thumbnail:      req.Media.Thumbnail,
+		Width:          0, // proto MediaRef 中无此字段
+		Height:         0, // proto MediaRef 中无此字段
+		Duration:       req.Media.DurationSec,
+		Thumbnail:      req.Media.ThumbnailKey,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -86,15 +107,17 @@ func (s *FileServer) CompleteUpload(ctx context.Context, req *pb.CompleteUploadR
 
 	return &pb.CompleteUploadResponse{
 		Message: &pb.MessageItem{
-			MediaRef: &pb.MediaRef{
-				ObjectKey:   file.ObjectKey,
-				Url:         file.URL,
-				Mime:        file.ContentType,
-				SizeBytes:   file.SizeBytes,
-				Width:       file.Width,
-				Height:      file.Height,
-				Duration:    file.Duration,
-				Thumbnail:   file.Thumbnail,
+			Body: &pb.MessageBody{
+				Body: &pb.MessageBody_File{
+					File: &pb.MediaRef{
+						ObjectKey:    file.ObjectKey,
+						Filename:     file.FileName,
+						ContentType:  file.ContentType,
+						SizeBytes:    file.SizeBytes,
+						DurationSec:  file.Duration,
+						ThumbnailKey: file.Thumbnail,
+					},
+				},
 			},
 		},
 	}, nil

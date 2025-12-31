@@ -58,21 +58,21 @@ type Client struct {
 
 // Hub 管理所有客户端连接
 type Hub struct {
-	clients       map[uint64]map[string]*Client // userID -> deviceID -> Client
-	broadcast     chan []byte
-	register      chan *Client
-	unregister    chan *Client
-	mu            sync.RWMutex
+	clients        map[uint64]map[string]*Client // userID -> deviceID -> Client
+	broadcast      chan []byte
+	register       chan *Client
+	unregister     chan *Client
+	mu             sync.RWMutex
 	messageUseCase in.MessageUseCase
 }
 
 // NewHub 创建Hub
 func NewHub(messageUseCase in.MessageUseCase) *Hub {
 	return &Hub{
-		clients:       make(map[uint64]map[string]*Client),
-		broadcast:     make(chan []byte, 256),
-		register:      make(chan *Client),
-		unregister:    make(chan *Client),
+		clients:        make(map[uint64]map[string]*Client),
+		broadcast:      make(chan []byte, 256),
+		register:       make(chan *Client),
+		unregister:     make(chan *Client),
 		messageUseCase: messageUseCase,
 	}
 }
@@ -281,11 +281,11 @@ func (c *Client) handleMessage(data []byte) {
 // handleSendMessage 处理发送消息请求
 func (c *Client) handleSendMessage(msg WSMessage) {
 	var req struct {
-		ConversationID uint64               `json:"conversation_id"`
-		ClientMsgID    string               `json:"client_msg_id"`
-		ContentType    int8                 `json:"content_type"`
+		ConversationID uint64                `json:"conversation_id"`
+		ClientMsgID    string                `json:"client_msg_id"`
+		ContentType    int8                  `json:"content_type"`
 		Content        entity.MessageContent `json:"content"`
-		ReplyToMsgID   *uint64              `json:"reply_to_msg_id"`
+		ReplyToMsgID   *uint64               `json:"reply_to_msg_id"`
 	}
 
 	if err := json.Unmarshal(msg.Data, &req); err != nil {
@@ -293,7 +293,7 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		return
 	}
 
-	result, err := c.hub.messageUseCase.SendMessage(context.Background(), &in.SendMessageInput{
+	result, err := c.hub.messageUseCase.SendMessage(context.Background(), &in.SendMessageRequest{
 		ConversationID: req.ConversationID,
 		SenderID:       c.userID,
 		ClientMsgID:    req.ClientMsgID,
@@ -344,13 +344,13 @@ func (c *Client) sendPong() {
 
 // NewMessageNotification 新消息通知结构
 type NewMessageNotification struct {
-	MessageID      uint64               `json:"message_id"`
-	ConversationID uint64               `json:"conversation_id"`
-	SenderID       uint64               `json:"sender_id"`
-	Seq            uint64               `json:"seq"`
-	ContentType    int8                 `json:"content_type"`
+	MessageID      uint64                `json:"message_id"`
+	ConversationID uint64                `json:"conversation_id"`
+	SenderID       uint64                `json:"sender_id"`
+	Seq            uint64                `json:"seq"`
+	ContentType    int8                  `json:"content_type"`
 	Content        entity.MessageContent `json:"content"`
-	CreatedAt      time.Time            `json:"created_at"`
+	CreatedAt      time.Time             `json:"created_at"`
 }
 
 // NotifyNewMessage 通知新消息

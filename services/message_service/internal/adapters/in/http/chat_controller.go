@@ -35,11 +35,11 @@ func (c *ChatController) RegisterRoutes(r *gin.RouterGroup) {
 
 // SendMessageRequest 发送消息请求
 type SendMessageRequest struct {
-	ConversationID uint64               `json:"conversation_id" binding:"required"`
-	ClientMsgID    string               `json:"client_msg_id" binding:"required"`
-	ContentType    int8                 `json:"content_type" binding:"required"`
+	ConversationID uint64                `json:"conversation_id" binding:"required"`
+	ClientMsgID    string                `json:"client_msg_id" binding:"required"`
+	ContentType    int8                  `json:"content_type" binding:"required"`
 	Content        entity.MessageContent `json:"content" binding:"required"`
-	ReplyToMsgID   *uint64              `json:"reply_to_msg_id"`
+	ReplyToMsgID   *uint64               `json:"reply_to_msg_id"`
 }
 
 // SendMessage 发送消息
@@ -63,7 +63,7 @@ func (c *ChatController) SendMessage(ctx *gin.Context) {
 		return
 	}
 
-	msg, err := c.messageUseCase.SendMessage(ctx.Request.Context(), &in.SendMessageInput{
+	msg, err := c.messageUseCase.SendMessage(ctx.Request.Context(), &in.SendMessageRequest{
 		ConversationID: req.ConversationID,
 		SenderID:       userID,
 		ClientMsgID:    req.ClientMsgID,
@@ -79,9 +79,9 @@ func (c *ChatController) SendMessage(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{
-			"message_id":   msg.ID,
-			"seq":          msg.Seq,
-			"created_at":   msg.CreatedAt,
+			"message_id": msg.ID,
+			"seq":        msg.Seq,
+			"created_at": msg.CreatedAt,
 		},
 	})
 }
@@ -122,13 +122,7 @@ func (c *ChatController) GetHistory(ctx *gin.Context) {
 		req.Limit = 50
 	}
 
-	messages, err := c.messageUseCase.GetHistory(ctx.Request.Context(), &in.GetHistoryInput{
-		ConversationID: req.ConversationID,
-		UserID:         userID,
-		AfterSeq:       req.AfterSeq,
-		BeforeSeq:      req.BeforeSeq,
-		Limit:          req.Limit,
-	})
+	messages, err := c.messageUseCase.GetHistory(ctx.Request.Context(), req.ConversationID, req.AfterSeq, req.Limit)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -169,11 +163,7 @@ func (c *ChatController) UpdateRead(ctx *gin.Context) {
 		return
 	}
 
-	err := c.messageUseCase.UpdateRead(ctx.Request.Context(), &in.UpdateReadInput{
-		ConversationID: req.ConversationID,
-		UserID:         userID,
-		ReadSeq:        req.ReadSeq,
-	})
+	err := c.messageUseCase.UpdateRead(ctx.Request.Context(), userID, req.ConversationID, req.ReadSeq)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

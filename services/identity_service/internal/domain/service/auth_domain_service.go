@@ -31,7 +31,7 @@ func (s *AuthDomainService) ValidateAccess(rule *vo.AccessRule, token *entity.Au
 }
 
 // ValidateToken 验证令牌状态
-func (s *AuthDomainService) ValidateToken(token *entity.AuthToken, userStatus *entity.UserStatus) error {
+func (s *AuthDomainService) ValidateToken(token *entity.AuthToken, userStatus *entity.UserBlockStatus) error {
 	// 1. 检查令牌是否过期
 	if token.IsExpired() {
 		return errors.ErrTokenExpired

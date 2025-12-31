@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc/metadata"
 
 	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
 )
@@ -87,13 +90,26 @@ func (g *Gateway) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 从claims中提取user_id
-		if userID, ok := claims["user_id"].(float64); ok {
-			c.Set("user_id", uint64(userID))
+		// 从claims中提取user_id（存在 jti 字段中）
+		if jti, ok := claims["jti"].(string); ok {
+			// jti 是 user_id 的字符串形式
+			var userID uint64
+			fmt.Sscanf(jti, "%d", &userID)
+			c.Set("user_id", userID)
 		}
 
 		c.Next()
 	}
+}
+
+// ctxWithUserID 创建带有 user_id metadata 的 gRPC 上下文
+func (g *Gateway) ctxWithUserID(c *gin.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	userID, exists := c.Get("user_id")
+	if exists {
+		ctx = metadata.AppendToOutgoingContext(ctx, "user_id", strconv.FormatUint(userID.(uint64), 10))
+	}
+	return ctx, cancel
 }
 
 // ==================== 请求/响应结构体 ====================
@@ -219,8 +235,18 @@ func (g *Gateway) handleUpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// 从上下文获取 user_id
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user_id not found"})
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
 	defer cancel()
+
+	// 通过 gRPC metadata 传递 user_id
+	ctx = metadata.AppendToOutgoingContext(ctx, "user_id", strconv.FormatUint(userID.(uint64), 10))
 
 	resp, err := g.identityClient.UpdateProfile(ctx, &imv1.UpdateProfileRequest{
 		DisplayName: req.DisplayName,
@@ -302,7 +328,7 @@ func (g *Gateway) handleDeleteContact(c *gin.Context) {
 // ==================== 会话相关 Handler ====================
 
 func (g *Gateway) handleGetConversations(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.conversationClient.ListMyConversations(ctx, &imv1.ListMyConversationsRequest{Page: 1, PageSize: 50})
@@ -324,7 +350,7 @@ func (g *Gateway) handleCreateConversation(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	memberIDs := make([]int64, len(req.MemberIDs))
@@ -366,7 +392,7 @@ func (g *Gateway) handleSendMessage(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	// 构建消息体
@@ -403,7 +429,7 @@ func (g *Gateway) handleGetHistory(c *gin.Context) {
 		req.Limit = 50
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.messageClient.GetHistory(ctx, &imv1.GetHistoryRequest{
@@ -428,7 +454,7 @@ func (g *Gateway) handleMarkRead(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	_, err := g.messageClient.UpdateRead(ctx, &imv1.UpdateReadRequest{
@@ -457,7 +483,7 @@ func (g *Gateway) handleGetPresence(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.presenceClient.GetOnline(ctx, &imv1.GetOnlineRequest{UserIds: req.UserIDs})
@@ -482,7 +508,7 @@ func (g *Gateway) handleCreateUpload(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.fileClient.CreateUpload(ctx, &imv1.CreateUploadRequest{
@@ -516,7 +542,7 @@ func (g *Gateway) handleCompleteUpload(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.fileClient.CompleteUpload(ctx, &imv1.CompleteUploadRequest{

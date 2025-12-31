@@ -2,10 +2,13 @@ package server
 
 import (
 	"context"
+	"strconv"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/EthanQC/IM/api/gen/im/v1"
@@ -29,71 +32,60 @@ func RegisterMessageServiceServer(s *grpc.Server, srv *MessageServer) {
 	pb.RegisterMessageServiceServer(s, srv)
 }
 
+// getUserIDFromMetadata 从 gRPC metadata 获取 user_id
+func getUserIDFromMetadata(ctx context.Context) (uint64, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	userIDStrs := md.Get("user_id")
+	if len(userIDStrs) == 0 {
+		return 0, status.Error(codes.Unauthenticated, "user_id not found in metadata")
+	}
+
+	userID, err := strconv.ParseUint(userIDStrs[0], 10, 64)
+	if err != nil {
+		return 0, status.Error(codes.InvalidArgument, "invalid user_id")
+	}
+	return userID, nil
+}
+
 // SendMessage 发送消息
 func (s *MessageServer) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*pb.SendMessageResponse, error) {
-	if req.ConversationId == 0 || req.SenderId == 0 || req.ClientMsgId == "" {
+	// 从 metadata 获取 userID
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.ConversationId == 0 || req.ClientMsgId == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
 	}
 
-	content := entity.MessageContent{}
-	if req.Content != nil {
-		if req.Content.Text != nil {
-			content.Text = &entity.TextContent{
-				Content:   req.Content.Text.Content,
-				Mentions:  make([]uint64, len(req.Content.Text.Mentions)),
-				MentionAll: req.Content.Text.MentionAll,
-			}
-			copy(content.Text.Mentions, req.Content.Text.Mentions)
-		}
-		if req.Content.Media != nil {
-			content.Media = &entity.MediaContent{
-				URL:       req.Content.Media.Url,
-				Thumbnail: req.Content.Media.Thumbnail,
-				FileName:  req.Content.Media.FileName,
-				FileSize:  req.Content.Media.FileSize,
-				Duration:  req.Content.Media.Duration,
-				Width:     req.Content.Media.Width,
-				Height:    req.Content.Media.Height,
-			}
-		}
-		if req.Content.Location != nil {
-			content.Location = &entity.LocationContent{
-				Latitude:  req.Content.Location.Latitude,
-				Longitude: req.Content.Location.Longitude,
-				Address:   req.Content.Location.Address,
-				Name:      req.Content.Location.Name,
-			}
-		}
-	}
+	// 从 proto MessageBody 转换为 domain MessageContent
+	content := s.bodyToContent(req.Body)
 
-	var replyToMsgID *uint64
-	if req.ReplyToMsgId != 0 {
-		replyToMsgID = &req.ReplyToMsgId
-	}
-
-	msg, err := s.messageUseCase.SendMessage(ctx, &in.SendMessageInput{
-		ConversationID: req.ConversationId,
-		SenderID:       req.SenderId,
+	msg, err := s.messageUseCase.SendMessage(ctx, &in.SendMessageRequest{
+		ConversationID: uint64(req.ConversationId),
+		SenderID:       userID,
 		ClientMsgID:    req.ClientMsgId,
 		ContentType:    entity.MessageContentType(req.ContentType),
 		Content:        content,
-		ReplyToMsgID:   replyToMsgID,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	return &pb.SendMessageResponse{
-		MessageId: msg.ID,
-		Seq:       msg.Seq,
-		CreatedAt: timestamppb.New(msg.CreatedAt),
+		Message: s.entityToMessageItem(msg),
 	}, nil
 }
 
 // GetHistory 获取历史消息
 func (s *MessageServer) GetHistory(ctx context.Context, req *pb.GetHistoryRequest) (*pb.GetHistoryResponse, error) {
-	if req.ConversationId == 0 || req.UserId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
+	if req.ConversationId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "conversation_id is required")
 	}
 
 	limit := int(req.Limit)
@@ -101,140 +93,169 @@ func (s *MessageServer) GetHistory(ctx context.Context, req *pb.GetHistoryReques
 		limit = 50
 	}
 
-	messages, err := s.messageUseCase.GetHistory(ctx, &in.GetHistoryInput{
-		ConversationID: req.ConversationId,
-		UserID:         req.UserId,
-		AfterSeq:       req.AfterSeq,
-		BeforeSeq:      req.BeforeSeq,
-		Limit:          limit,
-	})
+	messages, err := s.messageUseCase.GetHistory(ctx, uint64(req.ConversationId), uint64(req.AfterSeq), limit)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	pbMessages := make([]*pb.Message, len(messages))
+	items := make([]*pb.MessageItem, len(messages))
 	for i, msg := range messages {
-		pbMessages[i] = entityToProto(msg)
+		items[i] = s.entityToMessageItem(msg)
 	}
 
 	return &pb.GetHistoryResponse{
-		Messages: pbMessages,
+		Items: items,
 	}, nil
 }
 
 // UpdateRead 更新已读状态
-func (s *MessageServer) UpdateRead(ctx context.Context, req *pb.UpdateReadRequest) (*pb.UpdateReadResponse, error) {
-	if req.ConversationId == 0 || req.UserId == 0 || req.ReadSeq == 0 {
+func (s *MessageServer) UpdateRead(ctx context.Context, req *pb.UpdateReadRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.ConversationId == 0 || req.ReadSeq == 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
 	}
 
-	err := s.messageUseCase.UpdateRead(ctx, &in.UpdateReadInput{
-		ConversationID: req.ConversationId,
-		UserID:         req.UserId,
-		ReadSeq:        req.ReadSeq,
-	})
+	err = s.messageUseCase.UpdateRead(ctx, userID, uint64(req.ConversationId), uint64(req.ReadSeq))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &pb.UpdateReadResponse{
-		Success: true,
-	}, nil
+	return &emptypb.Empty{}, nil
 }
 
-// RevokeMessage 撤回消息
-func (s *MessageServer) RevokeMessage(ctx context.Context, req *pb.RevokeMessageRequest) (*pb.RevokeMessageResponse, error) {
-	if req.MessageId == 0 || req.UserId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
+// bodyToContent 将 proto MessageBody 转换为 domain MessageContent
+func (s *MessageServer) bodyToContent(body *pb.MessageBody) entity.MessageContent {
+	content := entity.MessageContent{}
+	if body == nil {
+		return content
 	}
 
-	err := s.messageUseCase.RevokeMessage(ctx, req.UserId, req.MessageId)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	switch b := body.Body.(type) {
+	case *pb.MessageBody_Text:
+		if b.Text != nil {
+			content.Text = &entity.TextContent{
+				Text: b.Text.Text,
+			}
+		}
+	case *pb.MessageBody_Image:
+		if b.Image != nil {
+			content.Image = &entity.MediaContent{
+				ObjectKey:   b.Image.ObjectKey,
+				Filename:    b.Image.Filename,
+				ContentType: b.Image.ContentType,
+				SizeBytes:   b.Image.SizeBytes,
+			}
+		}
+	case *pb.MessageBody_File:
+		if b.File != nil {
+			content.File = &entity.MediaContent{
+				ObjectKey:   b.File.ObjectKey,
+				Filename:    b.File.Filename,
+				ContentType: b.File.ContentType,
+				SizeBytes:   b.File.SizeBytes,
+			}
+		}
+	case *pb.MessageBody_Audio:
+		if b.Audio != nil {
+			content.Audio = &entity.MediaContent{
+				ObjectKey:   b.Audio.ObjectKey,
+				Filename:    b.Audio.Filename,
+				ContentType: b.Audio.ContentType,
+				SizeBytes:   b.Audio.SizeBytes,
+				DurationSec: int(b.Audio.DurationSec),
+			}
+		}
+	case *pb.MessageBody_Video:
+		if b.Video != nil {
+			content.Video = &entity.MediaContent{
+				ObjectKey:    b.Video.ObjectKey,
+				Filename:     b.Video.Filename,
+				ContentType:  b.Video.ContentType,
+				SizeBytes:    b.Video.SizeBytes,
+				DurationSec:  int(b.Video.DurationSec),
+				ThumbnailKey: b.Video.ThumbnailKey,
+			}
+		}
 	}
 
-	return &pb.RevokeMessageResponse{
-		Success: true,
-	}, nil
+	return content
 }
 
-// DeleteMessage 删除消息
-func (s *MessageServer) DeleteMessage(ctx context.Context, req *pb.DeleteMessageRequest) (*pb.DeleteMessageResponse, error) {
-	if req.MessageId == 0 || req.UserId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
+// entityToMessageItem 将 domain Message 转换为 proto MessageItem
+func (s *MessageServer) entityToMessageItem(msg *entity.Message) *pb.MessageItem {
+	if msg == nil {
+		return nil
 	}
 
-	err := s.messageUseCase.DeleteMessage(ctx, req.UserId, req.MessageId)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &pb.DeleteMessageResponse{
-		Success: true,
-	}, nil
-}
-
-// GetUnreadCount 获取未读数
-func (s *MessageServer) GetUnreadCount(ctx context.Context, req *pb.GetUnreadCountRequest) (*pb.GetUnreadCountResponse, error) {
-	if req.ConversationId == 0 || req.UserId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "invalid request parameters")
-	}
-
-	count, err := s.messageUseCase.GetUnreadCount(ctx, req.UserId, req.ConversationId)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &pb.GetUnreadCountResponse{
-		Count: int32(count),
-	}, nil
-}
-
-// entityToProto 将实体转换为protobuf消息
-func entityToProto(msg *entity.Message) *pb.Message {
-	pbMsg := &pb.Message{
-		Id:             msg.ID,
-		ConversationId: msg.ConversationID,
-		SenderId:       msg.SenderID,
-		ClientMsgId:    msg.ClientMsgID,
-		Seq:            msg.Seq,
+	item := &pb.MessageItem{
+		Id:             int64(msg.ID),
+		ConversationId: int64(msg.ConversationID),
+		SenderId:       int64(msg.SenderID),
+		Seq:            int64(msg.Seq),
 		ContentType:    pb.MessageContentType(msg.ContentType),
-		Status:         pb.MessageStatus(msg.Status),
-		CreatedAt:      timestamppb.New(msg.CreatedAt),
-		UpdatedAt:      timestamppb.New(msg.UpdatedAt),
+		CreateTime:     timestamppb.New(msg.CreatedAt),
 	}
 
-	if msg.ReplyToMsgID != nil {
-		pbMsg.ReplyToMsgId = *msg.ReplyToMsgID
+	// 构建 MessageBody
+	item.Body = s.contentToBody(msg.Content)
+
+	return item
+}
+
+// contentToBody 将 domain MessageContent 转换为 proto MessageBody
+func (s *MessageServer) contentToBody(content entity.MessageContent) *pb.MessageBody {
+	body := &pb.MessageBody{}
+
+	if content.Text != nil {
+		body.Body = &pb.MessageBody_Text{
+			Text: &pb.TextBody{
+				Text: content.Text.Text,
+			},
+		}
+	} else if content.Image != nil {
+		body.Body = &pb.MessageBody_Image{
+			Image: &pb.MediaRef{
+				ObjectKey:   content.Image.ObjectKey,
+				Filename:    content.Image.Filename,
+				ContentType: content.Image.ContentType,
+				SizeBytes:   content.Image.SizeBytes,
+			},
+		}
+	} else if content.Audio != nil {
+		body.Body = &pb.MessageBody_Audio{
+			Audio: &pb.MediaRef{
+				ObjectKey:   content.Audio.ObjectKey,
+				Filename:    content.Audio.Filename,
+				ContentType: content.Audio.ContentType,
+				SizeBytes:   content.Audio.SizeBytes,
+				DurationSec: int32(content.Audio.DurationSec),
+			},
+		}
+	} else if content.Video != nil {
+		body.Body = &pb.MessageBody_Video{
+			Video: &pb.MediaRef{
+				ObjectKey:    content.Video.ObjectKey,
+				Filename:     content.Video.Filename,
+				ContentType:  content.Video.ContentType,
+				SizeBytes:    content.Video.SizeBytes,
+				DurationSec:  int32(content.Video.DurationSec),
+				ThumbnailKey: content.Video.ThumbnailKey,
+			},
+		}
+	} else if content.File != nil {
+		body.Body = &pb.MessageBody_File{
+			File: &pb.MediaRef{
+				ObjectKey:   content.File.ObjectKey,
+				Filename:    content.File.Filename,
+				ContentType: content.File.ContentType,
+				SizeBytes:   content.File.SizeBytes,
+			},
+		}
 	}
 
-	pbMsg.Content = &pb.MessageContent{}
-	if msg.Content.Text != nil {
-		pbMsg.Content.Text = &pb.TextContent{
-			Content:    msg.Content.Text.Content,
-			Mentions:   msg.Content.Text.Mentions,
-			MentionAll: msg.Content.Text.MentionAll,
-		}
-	}
-	if msg.Content.Media != nil {
-		pbMsg.Content.Media = &pb.MediaContent{
-			Url:       msg.Content.Media.URL,
-			Thumbnail: msg.Content.Media.Thumbnail,
-			FileName:  msg.Content.Media.FileName,
-			FileSize:  msg.Content.Media.FileSize,
-			Duration:  msg.Content.Media.Duration,
-			Width:     msg.Content.Media.Width,
-			Height:    msg.Content.Media.Height,
-		}
-	}
-	if msg.Content.Location != nil {
-		pbMsg.Content.Location = &pb.LocationContent{
-			Latitude:  msg.Content.Location.Latitude,
-			Longitude: msg.Content.Location.Longitude,
-			Address:   msg.Content.Location.Address,
-			Name:      msg.Content.Location.Name,
-		}
-	}
-
-	return pbMsg
+	return body
 }
