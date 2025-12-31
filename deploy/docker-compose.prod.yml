@@ -1,0 +1,242 @@
+services:
+  # ==================== 基础设施 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: im_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: im_db
+    command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - im_network
+
+  redis:
+    image: redis:7.2
+    container_name: im_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - im_network
+
+  zookeeper:
+    image: bitnami/zookeeper:3.8
+    container_name: im_zookeeper
+    restart: unless-stopped
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - im_network
+
+  kafka:
+    image: bitnami/kafka:3.6
+    container_name: im_kafka
+    restart: unless-stopped
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: im_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - im_network
+
+  # ==================== 微服务 ====================
+  identity-service:
+    build:
+      context: ../services/identity_service
+      dockerfile: Dockerfile
+    container_name: im_identity
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "8080:8080"
+      - "9080:9080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  conversation-service:
+    build:
+      context: ../services/conversation_service
+      dockerfile: Dockerfile
+    container_name: im_conversation
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "8081:8081"
+      - "9081:9081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  message-service:
+    build:
+      context: ../services/message_service
+      dockerfile: Dockerfile
+    container_name: im_message
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8082:8082"
+      - "9082:9082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - im_network
+
+  delivery-service:
+    build:
+      context: ../services/delivery_service
+      dockerfile: Dockerfile
+    container_name: im_delivery
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "8083:8083"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - im_network
+
+  presence-service:
+    build:
+      context: ../services/presence_service
+      dockerfile: Dockerfile
+    container_name: im_presence
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "9084:9084"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  file-service:
+    build:
+      context: ../services/file_service
+      dockerfile: Dockerfile
+    container_name: im_file
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+    ports:
+      - "8085:8085"
+      - "9085:9085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  api-gateway:
+    build:
+      context: ../services/api_gateway
+      dockerfile: Dockerfile
+    container_name: im_gateway
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/configs/config.prod.yaml
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "80:8080"
+    depends_on:
+      - identity-service
+      - conversation-service
+      - message-service
+      - presence-service
+      - file-service
+    networks:
+      - im_network
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+
+networks:
+  im_network:
+    driver: bridge

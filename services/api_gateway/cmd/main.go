@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,11 +21,15 @@ import (
 
 type Config struct {
 	Server struct {
-		HTTPPort         int           `mapstructure:"http_port"`
-		GrpcAddrIdentity string        `mapstructure:"grpc_addr_identity"`
-		GrpcTimeout      time.Duration `mapstructure:"grpc_timeout"`
-		ReadTimeout      time.Duration `mapstructure:"read_timeout"`
-		WriteTimeout     time.Duration `mapstructure:"write_timeout"`
+		HTTPPort             int           `mapstructure:"http_port"`
+		GrpcAddrIdentity     string        `mapstructure:"grpc_addr_identity"`
+		GrpcAddrConversation string        `mapstructure:"grpc_addr_conversation"`
+		GrpcAddrMessage      string        `mapstructure:"grpc_addr_message"`
+		GrpcAddrPresence     string        `mapstructure:"grpc_addr_presence"`
+		GrpcAddrFile         string        `mapstructure:"grpc_addr_file"`
+		GrpcTimeout          time.Duration `mapstructure:"grpc_timeout"`
+		ReadTimeout          time.Duration `mapstructure:"read_timeout"`
+		WriteTimeout         time.Duration `mapstructure:"write_timeout"`
 	} `mapstructure:"server"`
 	JWT struct {
 		Secret string `mapstructure:"secret"`
@@ -30,14 +37,18 @@ type Config struct {
 }
 
 type Gateway struct {
-	cfg     Config
-	router  *gin.Engine
-	idc     imv1.IdentityServiceClient
-	timeout time.Duration
+	cfg              Config
+	router           *gin.Engine
+	identityClient   imv1.IdentityServiceClient
+	conversationClient imv1.ConversationServiceClient
+	messageClient    imv1.MessageServiceClient
+	presenceClient   imv1.PresenceServiceClient
+	fileClient       imv1.FileServiceClient
+	timeout          time.Duration
 }
 
 func main() {
-	cfgPath := flag.String("config", "configs/dev/api_gateway.yaml", "配置文件路径")
+	cfgPath := flag.String("config", "configs/config.dev.yaml", "配置文件路径")
 	flag.Parse()
 
 	cfg, err := loadConfig(*cfgPath)
@@ -45,18 +56,58 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	idConn, err := grpc.Dial(cfg.Server.GrpcAddrIdentity, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("dial identity_service: %v", err)
-	}
-	defer idConn.Close()
-
 	gw := &Gateway{
 		cfg:     cfg,
 		router:  gin.Default(),
-		idc:     imv1.NewIdentityServiceClient(idConn),
 		timeout: cfg.Server.GrpcTimeout,
 	}
+
+	// 连接各个gRPC服务
+	if cfg.Server.GrpcAddrIdentity != "" {
+		conn, err := grpc.Dial(cfg.Server.GrpcAddrIdentity, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Warning: failed to connect identity service: %v", err)
+		} else {
+			gw.identityClient = imv1.NewIdentityServiceClient(conn)
+		}
+	}
+
+	if cfg.Server.GrpcAddrConversation != "" {
+		conn, err := grpc.Dial(cfg.Server.GrpcAddrConversation, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Warning: failed to connect conversation service: %v", err)
+		} else {
+			gw.conversationClient = imv1.NewConversationServiceClient(conn)
+		}
+	}
+
+	if cfg.Server.GrpcAddrMessage != "" {
+		conn, err := grpc.Dial(cfg.Server.GrpcAddrMessage, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Warning: failed to connect message service: %v", err)
+		} else {
+			gw.messageClient = imv1.NewMessageServiceClient(conn)
+		}
+	}
+
+	if cfg.Server.GrpcAddrPresence != "" {
+		conn, err := grpc.Dial(cfg.Server.GrpcAddrPresence, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Warning: failed to connect presence service: %v", err)
+		} else {
+			gw.presenceClient = imv1.NewPresenceServiceClient(conn)
+		}
+	}
+
+	if cfg.Server.GrpcAddrFile != "" {
+		conn, err := grpc.Dial(cfg.Server.GrpcAddrFile, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("Warning: failed to connect file service: %v", err)
+		} else {
+			gw.fileClient = imv1.NewFileServiceClient(conn)
+		}
+	}
+
 	gw.registerRoutes()
 
 	addr := fmt.Sprintf(":%d", cfg.Server.HTTPPort)
@@ -66,10 +117,23 @@ func main() {
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
-	log.Printf("api_gateway listening on %s", addr)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("gateway failed: %v", err)
-	}
+
+	go func() {
+		log.Printf("API Gateway listening on %s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("gateway failed: %v", err)
+		}
+	}()
+
+	// 优雅关闭
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	srv.Shutdown(ctx)
+	log.Println("API Gateway shutdown")
 }
 
 func loadConfig(path string) (Config, error) {
@@ -78,6 +142,7 @@ func loadConfig(path string) (Config, error) {
 	viper.SetDefault("server.grpc_timeout", "3s")
 	viper.SetDefault("server.read_timeout", "5s")
 	viper.SetDefault("server.write_timeout", "5s")
+
 	var cfg Config
 	if err := viper.ReadInConfig(); err != nil {
 		return cfg, err
@@ -86,65 +151,4 @@ func loadConfig(path string) (Config, error) {
 		return cfg, err
 	}
 	return cfg, nil
-}
-
-func (g *Gateway) registerRoutes() {
-	g.router.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
-	g.router.POST("/api/auth/login", g.handleLogin)
-	g.router.POST("/api/auth/refresh", g.handleRefresh)
-}
-
-type loginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
-}
-
-type authResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
-}
-
-func (g *Gateway) handleLogin(c *gin.Context) {
-	var req loginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-		return
-	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
-	defer cancel()
-	resp, err := g.idc.Login(ctx, &imv1.LoginRequest{Username: req.Username, Password: req.Password})
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, authResponse{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
-		ExpiresIn:    resp.ExpiresIn,
-	})
-}
-
-func (g *Gateway) handleRefresh(c *gin.Context) {
-	var req refreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-		return
-	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
-	defer cancel()
-	resp, err := g.idc.Refresh(ctx, &imv1.RefreshRequest{RefreshToken: req.RefreshToken})
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, authResponse{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
-		ExpiresIn:    resp.ExpiresIn,
-	})
 }

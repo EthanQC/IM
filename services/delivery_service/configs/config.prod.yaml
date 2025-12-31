@@ -1,0 +1,29 @@
+# Delivery Service Production Configuration
+server:
+  http_port: 8083
+  mode: release
+
+mysql:
+  dsn: "root:${DB_PASSWORD}@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  addr: "redis:6379"
+  password: ${REDIS_PASSWORD}
+  db: 0
+  pool_size: 100
+
+kafka:
+  brokers:
+    - "kafka:9092"
+  group_id: "delivery-service-group"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+
+log:
+  level: info
+  format: json
+  output: stdout

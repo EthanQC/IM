@@ -1,23 +1,30 @@
 # Instant Messaging
-本项目是**基于微服务架构的即时通讯系统**，采用 **DDD（领域驱动设计）+ 六边形架构**，支持下列功能：
 
-* 单聊/群聊
-* 联系人管理
-* 多种消息类型（文本/文件/视频）
-* 离线消息处理
-* 文件共享
-* 音视频通话
+基于**微服务架构**的即时通讯系统，采用 **DDD（领域驱动设计）+ 六边形架构**
+
+---
+
+## 功能特性
+
+- 单聊 / 群聊
+- 联系人管理
+- 多种消息类型（文本/图片/文件/音视频）
+- 离线消息处理
+- 文件共享
+- 音视频通话（WebRTC）
+
+---
 
 ## 技术栈
 
 * 后端
   * 语言
-    * Go 1.24.2
+    * Go 1.25.5
     * Web 框架：Gin
     * ORM：GORM
     * go-redis
   * 服务间通信
-    * 同步：gRPC
+    * 同步：gRPC + Protobuf
     * 异步：Kafka（消息队列）
   * 接口定义与代码生成
     * protobuf
@@ -41,92 +48,368 @@
 * 前端
   * Vue3 + Vite + TS
 
-## 仓库目录
+---
+
+## 架构总览
+本项目采用前后端分离的 monorepo，通过 API-Gateway 作为对外的唯一入口网关，利用 DDD 对业务和技术需求做了拆分
 
 ```
 IM/
-├── api/                          # 统一的 Proto 定义和生成代码
-│   ├── proto/im/v1/              # *.proto 源文件（唯一入口）
-│   │   ├── identity.proto        # 身份服务接口
-│   │   ├── conversation.proto    # 会话服务接口
-│   │   ├── message.proto         # 消息服务接口
-│   │   ├── presence.proto        # 在线状态接口
-│   │   ├── file.proto            # 文件服务接口
-│   │   └── common.proto          # 公共类型
-│   └── gen/im/v1/                # buf generate 生成的 Go 代码
+├── api/                          # Proto 定义和生成代码
+│   ├── proto/im/v1/              # *.proto 源文件
+│   └── gen/im/v1/                # 生成的 Go 代码
 │
-├── services/                     # 微服务目录
-│   ├── api_gateway/              # HTTP/WS 网关
-│   ├── identity_service/         # 身份认证服务
-│   ├── conversation_service/     # 会话服务
-│   ├── message_service/          # 消息服务
-│   ├── delivery_service/         # 消息投递服务
-│   ├── presence-service/         # 在线状态服务
-│   ├── file_service/             # 文件服务
-│   └── media-signal-service/     # 音视频信令服务
+├── services/                     # 微服务
+│   ├── api_gateway/              # HTTP API 网关（端口 8080）
+│   ├── identity_service/         # 身份认证（端口 9080）
+│   ├── conversation_service/     # 会话管理（端口 9081）
+│   ├── message_service/          # 消息服务（端口 9082）
+│   ├── delivery_service/         # 消息投递（端口 8083）
+│   ├── presence_service/         # 在线状态（端口 9084）
+│   └── file_service/             # 文件服务（端口 9085）
 │
-├── pkg/                          # 跨服务共享库
-│   ├── zlog/                     # 基于 zap 的日志模块
-│   ├── constants/                # 常量定义
-│   ├── enum/                     # 枚举类型
-│   ├── util/                     # 工具函数
-│   └── ssl/                      # TLS 证书
+├── pkg/                          # 共享库
+│   ├── zlog/                     # 日志模块
+│   ├── constants/                # 常量
+│   └── enum/                     # 枚举
 │
 ├── deploy/                       # 部署配置
-│   ├── docker-compose.dev.yml    # 本地开发依赖
-│   └── sql/                      # 数据库初始化脚本
+│   ├── docker-compose.dev.yml    # 本地开发
+│   ├── docker-compose.prod.yml   # 生产环境
+│   └── sql/schema.sql            # 数据库脚本
 │
-├── web/chat-server/              # 前端代码（Vue3 + Vite）
-├── KamaChat/                     # 参考代码快照（旧版单体）
-├── go.work                       # Go workspace 配置
-├── buf.yaml                      # buf lint/generate 配置
-└── README.md                  
+└── go.work                       # Go workspace
 ```
 
+### 服务端口分配
 
-## 架构总览
+| 服务 | HTTP Port | gRPC Port | 说明 |
+|------|-----------|-----------|------|
+| API Gateway | 8080 | - | 统一入口网关 |
+| Identity Service | 8081 | 9080 | 身份认证、用户管理 |
+| Conversation Service | 8082 | 9081 | 会话管理 |
+| Message Service | 8083 | 9082 | 消息收发 |
+| Delivery Service | 8084 | - | 消息投递、WebSocket |
+| Presence Service | - | 9084 | 在线状态 |
+| File Service | 8085 | 9085 | 文件上传 |
 
-本项目采用前后端分离的 monorepo，通过 API-Gateway 作为对外的唯一入口网关，利用 DDD 对业务和技术需求做了拆分，已有身份、聊天、消息、投递、在线、音视频和文件共七个微服务
-
-
-
-
-
+### 服务说明
 #### api_gateway
-
+HTTP API 统一入口，负责：
+- 路由转发到各个微服务
+- JWT Token 认证
+- 请求限流与熔断
 
 #### identity_service
-
+身份认证服务，负责：
+- 用户注册、登录
+- JWT Token 签发与刷新
+- 联系人管理（好友申请、好友列表）
+- 用户资料管理
 
 #### conversation_service
+会话管理服务，负责：
+- 创建单聊/群聊会话
+- 会话成员管理
+- 会话信息维护
 
 #### message_service
+消息服务，负责：
+- 消息发送与存储
+- 消息历史查询
+- 已读状态管理
+- 消息撤回
+- 发布消息事件到 Kafka
 
 #### delivery_service
+消息投递服务，负责：
+- 消费 Kafka 消息事件
+- 通过 WebSocket 实时推送给在线用户
+- 离线消息存储
 
 #### presence_service
-
-#### media_signal_service
+在线状态服务，负责：
+- 用户上下线状态管理
+- 批量查询在线状态
 
 #### file_service
+文件服务，负责：
+- 生成 MinIO 预签名上传 URL
+- 文件元数据管理
 
+---
 
-
-
-
-## 环境管理
-
-
-## 快速开始（本地开发）
-
-只启动 MySQL + Redis：
+## 快速开始
+### 本地开发
+#### 克隆项目并安装依赖
 
 ```bash
-docker compose -f deploy/docker-compose.dev.yml up -d mysql redis
+# 克隆项目
+git clone https://github.com/EthanQC/IM.git
+cd IM
+
+# 下载所有模块依赖
+go work sync
+go mod download
 ```
 
+#### 拉取镜像并启动 Docker 容器
 
+```bash
+cd deploy
+docker compose -f docker-compose.dev.yml up -d
+```
 
+等待所有容器启动（首次需要拉取镜像，可能需要几分钟）：
+
+```bash
+# 检查容器状态
+docker ps
+
+# 应该看到 5 个容器：im_mysql, im_redis, im_kafka, im_zookeeper, im_minio
+```
+
+**基础设施服务信息：**
+
+| 服务 | 端口 | 访问地址 | 用户名 / 密码 |
+|------|------|----------|---------------|
+| MySQL | 3306 | localhost:3306 | root / imdev |
+| Redis | 6379 | localhost:6379 | 无密码 |
+| Kafka | 29092 | localhost:29092 | - |
+| MinIO API | 9000 | localhost:9000 | admin / admin123 |
+| MinIO 控制台 | 9001 | http://localhost:9001 | admin / admin123 |
+
+#### 启动 API Gateway
+
+```bash
+cd services/api_gateway/cmd
+go run main.go handlers.go -config ../configs/config.dev.yaml
+```
+
+看到以下输出表示启动成功：
+```
+API Gateway listening on :8080
+```
+
+#### 访问 API 文档
+
+打开浏览器访问：**http://localhost:8080/swagger**
+
+在 Swagger UI 中可以：
+- 查看所有 API 接口
+- 点击 "Try it out" 直接测试
+- 需要认证的接口，先登录获取 token，然后点击 "Authorize" 按钮输入
+
+### 部署上云
+#### 使用 Docker Compose
+
+```bash
+cd deploy
+
+# 复制环境变量文件
+cp .env.example .env
+
+# 编辑 .env 文件，设置安全的密码
+vim .env
+
+# 启动所有服务
+docker compose -f docker-compose.prod.yml up -d
+```
+
+#### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| MYSQL_ROOT_PASSWORD | MySQL root 密码 |
+| REDIS_PASSWORD | Redis 密码 |
+| JWT_SECRET | JWT 签名密钥 |
+| MINIO_ROOT_USER | MinIO 管理员用户名 |
+| MINIO_ROOT_PASSWORD | MinIO 管理员密码 |
+
+---
+
+## API 接口
+#### 认证（无需 Token）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/auth/register | 用户注册 |
+| POST | /api/auth/login | 用户登录 |
+| POST | /api/auth/refresh | 刷新 Token |
+
+#### 用户
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/users/me | 获取当前用户资料 |
+| PUT | /api/users/me | 更新用户资料 |
+
+#### 联系人
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/contacts | 获取联系人列表 |
+| POST | /api/contacts/apply | 发送好友申请 |
+| POST | /api/contacts/handle | 处理好友申请 |
+
+#### 会话
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/conversations | 获取会话列表 |
+| POST | /api/conversations | 创建会话 |
+
+#### 消息
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/messages | 发送消息 |
+| GET | /api/messages/history | 获取历史消息 |
+| POST | /api/messages/read | 标记已读 |
+
+#### 在线状态
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/presence | 批量查询在线状态 |
+
+#### 文件
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/files/upload | 获取上传 URL |
+| POST | /api/files/complete | 完成上传 |
+
+---
+
+## 完整服务启动（可选）
+
+如果需要完整的后端功能（不仅仅是 API Gateway），需要启动所有微服务
+
+在**不同的终端**中分别执行：
+
+```bash
+# 终端 1 - Identity Service
+cd services/identity_service
+go run cmd/main.go -config configs/config.dev.yaml
+
+# 终端 2 - Conversation Service
+cd services/conversation_service
+go run cmd/main.go -config configs/config.dev.yaml
+
+# 终端 3 - Message Service
+cd services/message_service
+go run cmd/chat-server/main.go -config configs/config.dev.yaml
+
+# 终端 4 - Delivery Service
+cd services/delivery_service
+go run cmd/user-server/main.go -config configs/config.dev.yaml
+
+# 终端 5 - Presence Service
+cd services/presence_service
+go run cmd/main.go -config configs/config.dev.yaml
+
+# 终端 6 - File Service
+cd services/file_service
+go run cmd/main.go -config configs/config.dev.yaml
+
+# 终端 7 - API Gateway（必须最后启动）
+cd services/api_gateway/cmd
+go run main.go handlers.go -config ../configs/config.dev.yaml
+```
+
+---
+
+## 常用命令
+#### 进程管理
+
+```bash
+# 查看占用 8080 端口的进程
+lsof -i :8080
+
+# 查看所有 Go 进程
+ps aux | grep "go run"
+
+# 停止占用 8080 端口的进程
+kill $(lsof -t -i :8080)
+
+# 停止所有 Go 进程
+pkill -f "go run"
+```
+
+#### Docker 容器管理
+
+```bash
+# 查看运行中的容器
+docker ps
+
+# 查看所有容器（包括已停止的）
+docker ps -a
+
+# 查看容器日志
+docker logs im_mysql
+docker logs im_kafka
+
+# 停止所有容器
+cd deploy && docker compose -f docker-compose.dev.yml down
+
+# 停止并删除所有数据（重新开始）
+cd deploy && docker compose -f docker-compose.dev.yml down -v
+
+# 重新启动
+cd deploy && docker compose -f docker-compose.dev.yml up -d
+```
+
+#### 依赖管理
+
+```bash
+# 同步 workspace
+go work sync
+
+# 下载依赖
+go mod download
+
+# 整理依赖
+go mod tidy
+```
+
+#### 常见问题
+##### Q: 端口被占用怎么办？
+
+```bash
+# 查看占用端口的进程
+lsof -i :8080
+
+# 杀死进程
+kill -9 <PID>
+```
+
+##### Q: MySQL 连接失败？
+
+等待 MySQL 完全启动（约 30 秒）：
+```bash
+docker logs im_mysql  # 查看日志
+```
+
+##### Q: Swagger 页面打不开？
+
+确保是从 `services/api_gateway/cmd` 目录启动的：
+```bash
+cd services/api_gateway/cmd
+go run main.go handlers.go -config ../configs/config.dev.yaml
+```
+
+##### Q: 如何完全重置环境？
+
+```bash
+# 停止所有容器并删除数据
+cd deploy && docker compose -f docker-compose.dev.yml down -v
+
+# 重新启动
+docker compose -f docker-compose.dev.yml up -d
+```
+
+---
 
 ## 其他需求
 二、技术需求

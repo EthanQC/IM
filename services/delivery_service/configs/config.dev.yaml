@@ -1,0 +1,30 @@
+# Delivery Service 开发环境配置
+
+server:
+  http_port: 8083
+  mode: debug
+
+mysql:
+  dsn: "root:imdev@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  pool_size: 100
+
+kafka:
+  brokers:
+    - "127.0.0.1:29092"
+  group_id: "delivery-service-group"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+
+log:
+  level: debug
+  format: json
+  output: stdout

@@ -1,0 +1,747 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IM 即时通讯系统 API",
+    "description": "基于微服务架构的即时通讯系统 REST API 文档\n\n## 认证说明\n除了 `/api/auth/*` 开头的接口，其他所有接口都需要在 Header 中携带 JWT Token：\n```\nAuthorization: Bearer <your_access_token>\n```\n\n## 错误码说明\n- `401`: 未授权，Token 无效或已过期\n- `400`: 请求参数错误\n- `500`: 服务器内部错误",
+    "version": "1.0.0",
+    "contact": {
+      "name": "IM Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "本地开发环境"
+    }
+  ],
+  "tags": [
+    {"name": "认证", "description": "用户注册、登录、Token刷新"},
+    {"name": "用户", "description": "用户资料管理"},
+    {"name": "联系人", "description": "好友申请、联系人管理"},
+    {"name": "会话", "description": "单聊/群聊会话管理"},
+    {"name": "消息", "description": "消息发送、历史记录、已读状态"},
+    {"name": "在线状态", "description": "用户在线/离线状态查询"},
+    {"name": "文件", "description": "文件上传"}
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "健康检查",
+        "description": "检查 API Gateway 服务是否正常运行",
+        "responses": {
+          "200": {
+            "description": "服务正常",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ok"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户注册",
+        "description": "创建新用户账号",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {"type": "string", "minLength": 3, "maxLength": 32, "example": "testuser"},
+                  "password": {"type": "string", "minLength": 6, "example": "123456"},
+                  "nickname": {"type": "string", "example": "测试用户"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "message": {"type": "string", "example": "success"},
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user_id": {"type": "integer", "example": 1}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误或用户名已存在",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户登录",
+        "description": "使用用户名和密码登录，获取 JWT Token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {"type": "string", "example": "testuser"},
+                  "password": {"type": "string", "example": "123456"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AuthResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "用户名或密码错误",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "刷新 Token",
+        "description": "使用 Refresh Token 获取新的 Access Token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                  "refresh_token": {"type": "string", "example": "eyJhbGciOiJIUzI1NiIs..."}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "刷新成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AuthResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh Token 无效或已过期",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": ["用户"],
+        "summary": "获取当前用户资料",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {"$ref": "#/components/schemas/User"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      },
+      "put": {
+        "tags": ["用户"],
+        "summary": "更新当前用户资料",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nickname": {"type": "string", "example": "新昵称"},
+                  "avatar_url": {"type": "string", "example": "https://example.com/avatar.jpg"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/contacts": {
+      "get": {
+        "tags": ["联系人"],
+        "summary": "获取联系人列表",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Contact"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/contacts/apply": {
+      "post": {
+        "tags": ["联系人"],
+        "summary": "发送好友申请",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["target_user_id"],
+                "properties": {
+                  "target_user_id": {"type": "integer", "example": 2, "description": "目标用户ID"},
+                  "remark": {"type": "string", "example": "我是小明", "description": "申请备注"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "申请发送成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/contacts/handle": {
+      "post": {
+        "tags": ["联系人"],
+        "summary": "处理好友申请",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["apply_id", "accept"],
+                "properties": {
+                  "apply_id": {"type": "integer", "example": 1, "description": "申请ID"},
+                  "accept": {"type": "boolean", "example": true, "description": "是否接受"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "处理成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/conversations": {
+      "get": {
+        "tags": ["会话"],
+        "summary": "获取会话列表",
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Conversation"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      },
+      "post": {
+        "tags": ["会话"],
+        "summary": "创建会话",
+        "description": "创建单聊或群聊会话",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": {"type": "integer", "enum": [1, 2], "description": "1: 单聊, 2: 群聊"},
+                  "participant_id": {"type": "integer", "description": "单聊时对方用户ID"},
+                  "member_ids": {"type": "array", "items": {"type": "integer"}, "description": "群聊时成员ID列表"},
+                  "name": {"type": "string", "description": "群聊名称"}
+                }
+              },
+              "examples": {
+                "单聊": {
+                  "value": {"type": 1, "participant_id": 2}
+                },
+                "群聊": {
+                  "value": {"type": 2, "member_ids": [2, 3, 4], "name": "测试群"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "conversation_id": {"type": "integer", "example": 1}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/messages": {
+      "post": {
+        "tags": ["消息"],
+        "summary": "发送消息",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["conversation_id", "client_msg_id", "content_type", "content"],
+                "properties": {
+                  "conversation_id": {"type": "integer", "example": 1},
+                  "client_msg_id": {"type": "string", "example": "uuid-xxxxx", "description": "客户端生成的消息ID，用于去重"},
+                  "content_type": {"type": "integer", "enum": [1, 2, 3, 4, 5, 6, 7], "description": "1:文本 2:图片 3:语音 4:视频 5:文件 6:位置 7:自定义"},
+                  "content": {
+                    "type": "object",
+                    "description": "消息内容，根据content_type不同而不同",
+                    "properties": {
+                      "text": {
+                        "type": "object",
+                        "properties": {
+                          "content": {"type": "string", "example": "Hello World!"}
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "conversation_id": 1,
+                "client_msg_id": "550e8400-e29b-41d4-a716-446655440000",
+                "content_type": 1,
+                "content": {
+                  "text": {"content": "Hello World!"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "发送成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message_id": {"type": "integer", "example": 1},
+                        "seq": {"type": "integer", "example": 1}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/messages/history": {
+      "get": {
+        "tags": ["消息"],
+        "summary": "获取历史消息",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "conversation_id", "in": "query", "required": true, "schema": {"type": "integer"}, "description": "会话ID"},
+          {"name": "before_seq", "in": "query", "schema": {"type": "integer"}, "description": "获取此seq之前的消息"},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50}, "description": "返回数量，默认50"}
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Message"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/messages/read": {
+      "post": {
+        "tags": ["消息"],
+        "summary": "标记已读",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["conversation_id", "read_seq"],
+                "properties": {
+                  "conversation_id": {"type": "integer", "example": 1},
+                  "read_seq": {"type": "integer", "example": 10, "description": "已读到的消息序号"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/presence": {
+      "get": {
+        "tags": ["在线状态"],
+        "summary": "批量查询在线状态",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "user_ids", "in": "query", "required": true, "schema": {"type": "array", "items": {"type": "integer"}}, "description": "用户ID列表"}
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {"type": "integer"},
+                          "online": {"type": "boolean"},
+                          "last_seen": {"type": "string", "format": "date-time"}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/files/upload": {
+      "post": {
+        "tags": ["文件"],
+        "summary": "获取文件上传URL",
+        "description": "获取 MinIO 预签名上传URL，然后客户端直接上传到 MinIO",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["filename", "content_type", "size_bytes"],
+                "properties": {
+                  "filename": {"type": "string", "example": "photo.jpg"},
+                  "content_type": {"type": "string", "example": "image/jpeg"},
+                  "size_bytes": {"type": "integer", "example": 1024000},
+                  "kind": {"type": "string", "enum": ["image", "video", "audio", "file"], "example": "image"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "object_key": {"type": "string", "example": "uploads/2024/01/01/abc123.jpg"},
+                        "upload_url": {"type": "string", "example": "http://localhost:9000/im-files/uploads/...?X-Amz-Signature=..."},
+                        "callback_url": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    },
+    "/api/files/complete": {
+      "post": {
+        "tags": ["文件"],
+        "summary": "完成文件上传",
+        "description": "客户端上传到 MinIO 后，调用此接口完成上传并发送文件消息",
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["conversation_id", "client_msg_id", "object_key"],
+                "properties": {
+                  "conversation_id": {"type": "integer", "example": 1},
+                  "client_msg_id": {"type": "string", "example": "uuid-xxxxx"},
+                  "object_key": {"type": "string", "example": "uploads/2024/01/01/abc123.jpg"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "data": {"$ref": "#/components/schemas/Message"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "未授权"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入从 /api/auth/login 获取的 access_token"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string", "example": "error message"}
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "integer", "example": 0},
+          "message": {"type": "string", "example": "success"}
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {"type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."},
+          "refresh_token": {"type": "string", "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."},
+          "expires_in": {"type": "integer", "example": 900, "description": "Access Token 过期时间（秒）"}
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer", "example": 1},
+          "username": {"type": "string", "example": "testuser"},
+          "nickname": {"type": "string", "example": "测试用户"},
+          "avatar_url": {"type": "string", "example": "https://example.com/avatar.jpg"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "contact_user_id": {"type": "integer"},
+          "nickname": {"type": "string"},
+          "avatar_url": {"type": "string"},
+          "remark": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "type": {"type": "integer", "description": "1: 单聊, 2: 群聊"},
+          "name": {"type": "string"},
+          "avatar_url": {"type": "string"},
+          "last_message": {"type": "string"},
+          "last_message_time": {"type": "string", "format": "date-time"},
+          "unread_count": {"type": "integer"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "conversation_id": {"type": "integer"},
+          "sender_id": {"type": "integer"},
+          "seq": {"type": "integer"},
+          "content_type": {"type": "integer"},
+          "content": {"type": "object"},
+          "status": {"type": "integer", "description": "0: 正常, 1: 已撤回, 2: 已删除"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}
