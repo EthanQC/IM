@@ -27,7 +27,7 @@ type ContactUseCase interface {
 	ApplyContact(ctx context.Context, fromUserID, toUserID uint64, message *string) error
 	
 	// RespondContact 响应联系人申请
-	RespondContact(ctx context.Context, applyID uint64, userID uint64, accept bool) error
+	RespondContact(ctx context.Context, fromUserID uint64, userID uint64, accept bool) error
 	
 	// RemoveContact 删除联系人
 	RemoveContact(ctx context.Context, userID, friendID uint64) error

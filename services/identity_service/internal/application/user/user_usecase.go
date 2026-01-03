@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/EthanQC/IM/services/identity_service/internal/domain/entity"
@@ -132,7 +133,8 @@ func (uc *UserUseCaseImpl) Login(ctx context.Context, username, password string)
 	}
 
 	// 生成JWT Token (使用 Generate 方法，15分钟有效期)
-	token, err := uc.jwtManager.Generate(fmt.Sprintf("%d", user.ID), user.Username, 15*time.Minute)
+	tokenID := uuid.New().String()
+	token, err := uc.jwtManager.Generate(tokenID, fmt.Sprintf("%d", user.ID), 15*time.Minute)
 	if err != nil {
 		return nil, "", fmt.Errorf("generate token: %w", err)
 	}

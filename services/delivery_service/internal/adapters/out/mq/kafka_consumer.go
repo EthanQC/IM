@@ -135,14 +135,14 @@ func (h *consumerGroupHandler) handleMessage(ctx context.Context, message *saram
 
 func (h *consumerGroupHandler) handleNewMessage(ctx context.Context, data []byte) {
 	var event struct {
-		MessageID      uint64    `json:"message_id"`
-		ConversationID uint64    `json:"conversation_id"`
-		SenderID       uint64    `json:"sender_id"`
-		ReceiverIDs    []uint64  `json:"receiver_ids"`
-		Seq            uint64    `json:"seq"`
-		ContentType    int8      `json:"content_type"`
-		Content        string    `json:"content"`
-		CreatedAt      time.Time `json:"created_at"`
+		MessageID      uint64   `json:"message_id"`
+		ConversationID uint64   `json:"conversation_id"`
+		SenderID       uint64   `json:"sender_id"`
+		ReceiverIDs    []uint64 `json:"receiver_ids"`
+		Seq            uint64   `json:"seq"`
+		ContentType    int8     `json:"content_type"`
+		Content        string   `json:"content"`
+		CreatedAt      int64    `json:"created_at"`
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
@@ -159,7 +159,7 @@ func (h *consumerGroupHandler) handleNewMessage(ctx context.Context, data []byte
 		Seq:            event.Seq,
 		ContentType:    event.ContentType,
 		Content:        event.Content,
-		CreatedAt:      event.CreatedAt,
+		CreatedAt:      time.Unix(event.CreatedAt, 0),
 	}
 
 	if err := h.deliveryUseCase.DeliverMessage(ctx, msgEvent); err != nil {
@@ -171,7 +171,9 @@ func (h *consumerGroupHandler) handleMessageRead(ctx context.Context, data []byt
 	var event struct {
 		ConversationID uint64 `json:"conversation_id"`
 		UserID         uint64 `json:"user_id"`
+		ReceiverIDs    []uint64 `json:"receiver_ids"`
 		ReadSeq        uint64 `json:"read_seq"`
+		ReadAt         int64  `json:"read_at"`
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
@@ -186,12 +188,17 @@ func (h *consumerGroupHandler) handleMessageRead(ctx context.Context, data []byt
 			"conversation_id": event.ConversationID,
 			"user_id":         event.UserID,
 			"read_seq":        event.ReadSeq,
+			"read_at":         event.ReadAt,
 		},
 	})
 
-	// TODO: 获取会话中的其他用户并投递
-	if err := h.deliveryUseCase.DeliverToUser(ctx, event.UserID, payload); err != nil {
-		log.Printf("Failed to deliver read receipt: %v", err)
+	for _, receiverID := range event.ReceiverIDs {
+		if receiverID == event.UserID {
+			continue
+		}
+		if err := h.deliveryUseCase.DeliverToUser(ctx, receiverID, payload); err != nil {
+			log.Printf("Failed to deliver read receipt: %v", err)
+		}
 	}
 }
 

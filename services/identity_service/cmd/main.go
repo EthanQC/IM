@@ -22,6 +22,7 @@ import (
 	mysqlRepo "github.com/EthanQC/IM/services/identity_service/internal/adapters/out/mysql"
 	redisRepo "github.com/EthanQC/IM/services/identity_service/internal/adapters/out/redis"
 	authApp "github.com/EthanQC/IM/services/identity_service/internal/application/auth"
+	contactApp "github.com/EthanQC/IM/services/identity_service/internal/application/contact"
 	smsApp "github.com/EthanQC/IM/services/identity_service/internal/application/sms"
 	statusApp "github.com/EthanQC/IM/services/identity_service/internal/application/status"
 	userApp "github.com/EthanQC/IM/services/identity_service/internal/application/user"
@@ -31,8 +32,9 @@ import (
 // Config 定义从 YAML 加载的所有配置项
 type Config struct {
 	Server struct {
-		HTTPPort int `mapstructure:"port"`
+		HTTPPort int `mapstructure:"http_port"`
 		GrpcPort int `mapstructure:"grpc_port"`
+		Mode     string `mapstructure:"mode"`
 	} `mapstructure:"server"`
 	JWT struct {
 		Secret     string        `mapstructure:"secret"`
@@ -66,7 +68,7 @@ type Config struct {
 
 func main() {
 	// 仅定义一个配置文件路径参数
-	cfgPath := flag.String("config", "configs/dev/identity_service.yaml", "配置文件路径（YAML）")
+	cfgPath := flag.String("config", "configs/config.dev.yaml", "配置文件路径（YAML）")
 	flag.Parse()
 
 	// 加载配置
@@ -91,6 +93,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("连接 MySQL 失败: %v", err)
 	}
+	if cfg.Server.Mode != "release" {
+		if err := db.AutoMigrate(&mysqlRepo.RefreshTokenModel{}); err != nil {
+			log.Fatalf("初始化 refresh_tokens 表失败: %v", err)
+		}
+	}
 
 	// 初始化 Redis
 	ctx := context.Background()
@@ -108,9 +115,13 @@ func main() {
 	refreshTokenRepo := mysqlRepo.NewRefreshTokenRepoMysql(db)
 	userStatusRepo := mysqlRepo.NewUserStatusRepoMysql(db)
 	userRepo := mysqlRepo.NewUserRepositoryMySQL(db)
+	contactRepo := mysqlRepo.NewContactRepositoryMySQL(db)
+	contactApplyRepo := mysqlRepo.NewContactApplyRepositoryMySQL(db)
+	blacklistRepo := mysqlRepo.NewBlacklistRepositoryMySQL(db)
 
 	// 用户用例
 	userUC := userApp.NewUserUseCaseImpl(userRepo, jwtMgr, nil)
+	contactUC := contactApp.NewContactUseCaseImpl(contactRepo, contactApplyRepo, blacklistRepo, userRepo)
 
 	// 短信服务用例
 	smsClient, _ := aliyunSms.NewAliyunSMSClient(
@@ -151,6 +162,7 @@ func main() {
 		revokeUC,
 		statusUC,
 		smsVerifyUC,
+		userRepo,
 	)
 
 	// 启动 HTTP 服务
@@ -175,6 +187,7 @@ func main() {
 	grpcAdapter.NewAuthServer(
 		authUC,
 		userUC,
+		contactUC,
 		smsSendUC,
 	).RegisterServer(grpcServer)
 	log.Printf("gRPC 服务启动: %s", grpcAddr)

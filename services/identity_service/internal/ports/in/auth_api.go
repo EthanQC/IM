@@ -12,7 +12,7 @@ type AuthUseCase interface {
 	RefreshToken(ctx context.Context, refreshJTI string) (*entity.AuthToken, error)
 
 	// 登录相关
-	LoginByPassword(ctx context.Context, identifier string, password vo.Password) (*entity.AuthToken, error)
+	LoginByPassword(ctx context.Context, identifier string, password string) (*entity.AuthToken, error)
 	LoginBySMS(ctx context.Context, phone vo.Phone, code string) (*entity.AuthToken, error)
 	Logout(ctx context.Context, accessJTI string) error
 }

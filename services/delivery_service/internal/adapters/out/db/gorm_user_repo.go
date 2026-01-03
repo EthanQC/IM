@@ -24,7 +24,7 @@ type PendingMessageModel struct {
 }
 
 func (PendingMessageModel) TableName() string {
-	return "outbox"
+	return "pending_messages"
 }
 
 func (m *PendingMessageModel) toEntity() *entity.PendingMessage {

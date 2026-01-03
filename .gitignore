@@ -92,3 +92,4 @@ dump.rdb
 
 
 .gocache/
+.gomodcache/

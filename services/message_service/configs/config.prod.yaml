@@ -5,6 +5,10 @@ server:
   grpc_port: 9082
   mode: release
 
+grpc:
+  conversation_addr: "conversation-service:9081"
+  timeout: 3s
+
 mysql:
   dsn: "${MYSQL_DSN}"
   max_idle_conns: 50

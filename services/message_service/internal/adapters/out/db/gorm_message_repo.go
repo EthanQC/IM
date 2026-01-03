@@ -209,7 +209,7 @@ func (r *SequenceRepositoryMySQL) GetNextSeq(ctx context.Context, conversationID
 				// 首次创建
 				model = SequenceModel{
 					ConversationID: conversationID,
-					NextSeq:        1,
+					NextSeq:        2,
 				}
 				if err := tx.Create(&model).Error; err != nil {
 					return err
@@ -221,6 +221,21 @@ func (r *SequenceRepositoryMySQL) GetNextSeq(ctx context.Context, conversationID
 		}
 
 		seq = model.NextSeq
+		if model.NextSeq == 1 {
+			var maxSeq uint64
+			if err := tx.Model(&MessageModel{}).
+				Select("MAX(seq)").
+				Where("conversation_id = ?", conversationID).
+				Scan(&maxSeq).Error; err != nil {
+				return err
+			}
+			if maxSeq >= seq {
+				seq = maxSeq + 1
+				model.NextSeq = seq + 1
+				return tx.Save(&model).Error
+			}
+		}
+
 		model.NextSeq++
 		return tx.Save(&model).Error
 	})

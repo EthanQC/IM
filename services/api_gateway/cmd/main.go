@@ -25,6 +25,7 @@ type Config struct {
 		GrpcAddrIdentity     string        `mapstructure:"grpc_addr_identity"`
 		GrpcAddrConversation string        `mapstructure:"grpc_addr_conversation"`
 		GrpcAddrMessage      string        `mapstructure:"grpc_addr_message"`
+		HttpAddrMessage      string        `mapstructure:"http_addr_message"`
 		GrpcAddrPresence     string        `mapstructure:"grpc_addr_presence"`
 		GrpcAddrFile         string        `mapstructure:"grpc_addr_file"`
 		GrpcTimeout          time.Duration `mapstructure:"grpc_timeout"`

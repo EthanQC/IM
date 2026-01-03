@@ -55,6 +55,7 @@ func (uc *GenerateTokenUseCase) Execute(ctx context.Context, userID string) (str
 		return "", "", fmt.Errorf("生成 AccessToken 失败: %w", err)
 	}
 	at.AccessToken = accessToken
+	at.ExpiresAt = time.Now().Add(uc.AccessTTL)
 
 	refreshToken, err := uc.JWTManager.Generate(at.ID, userID, uc.RefreshTTL)
 	if err != nil {

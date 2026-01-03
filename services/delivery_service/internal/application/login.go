@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/EthanQC/IM/services/delivery_service/internal/domain/entity"
@@ -110,8 +111,8 @@ func (uc *DeliveryUseCaseImpl) sendPushNotification(ctx context.Context, userID 
 		Title:  "新消息",
 		Body:   "您收到一条新消息",
 		Data: map[string]string{
-			"conversation_id": string(rune(event.ConversationID)),
-			"message_id":      string(rune(event.MessageID)),
+			"conversation_id": strconv.FormatUint(event.ConversationID, 10),
+			"message_id":      strconv.FormatUint(event.MessageID, 10),
 		},
 	}
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -87,8 +88,12 @@ func main() {
 		// 从JWT或Query中获取用户信息
 		userID := c.GetUint64("user_id")
 		if userID == 0 {
-			// 尝试从query获取（用于测试）
-			userID = uint64(c.GetInt("user_id"))
+			// 尝试从query获取（用于测试或内网）
+			if userIDStr := c.Query("user_id"); userIDStr != "" {
+				if parsed, err := strconv.ParseUint(userIDStr, 10, 64); err == nil {
+					userID = parsed
+				}
+			}
 		}
 		if userID == 0 {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})

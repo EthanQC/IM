@@ -5,6 +5,10 @@ server:
   grpc_port: 9082
   mode: debug
 
+grpc:
+  conversation_addr: "127.0.0.1:9081"
+  timeout: 3s
+
 mysql:
   dsn: "root:imdev@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
   max_idle_conns: 10

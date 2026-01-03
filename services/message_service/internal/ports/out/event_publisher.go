@@ -19,6 +19,7 @@ type MessageSentEvent struct {
 	MessageID      uint64 `json:"message_id"`
 	ConversationID uint64 `json:"conversation_id"`
 	SenderID       uint64 `json:"sender_id"`
+	ReceiverIDs    []uint64 `json:"receiver_ids"`
 	Seq            uint64 `json:"seq"`
 	ContentType    int8   `json:"content_type"`
 	Content        string `json:"content"`
@@ -30,6 +31,7 @@ type MessageRevokedEvent struct {
 	MessageID      uint64 `json:"message_id"`
 	ConversationID uint64 `json:"conversation_id"`
 	SenderID       uint64 `json:"sender_id"`
+	ReceiverIDs    []uint64 `json:"receiver_ids"`
 	RevokedAt      int64  `json:"revoked_at"`
 }
 
@@ -37,6 +39,7 @@ type MessageRevokedEvent struct {
 type MessageReadEvent struct {
 	UserID         uint64 `json:"user_id"`
 	ConversationID uint64 `json:"conversation_id"`
+	ReceiverIDs    []uint64 `json:"receiver_ids"`
 	ReadSeq        uint64 `json:"read_seq"`
 	ReadAt         int64  `json:"read_at"`
 }

@@ -36,7 +36,7 @@ type smsLoginRequest struct {
 }
 
 type refreshRequest struct {
-	RefreshJTI string `json:"refresh_jti"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type logoutRequest struct {
@@ -59,12 +59,7 @@ func (h *AuthHandler) loginByPassword(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
-	pw, err := vo.NewPassword(req.Password)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid password format"})
-		return
-	}
-	at, err := h.authUC.LoginByPassword(ctx, req.Identifier, *pw)
+	at, err := h.authUC.LoginByPassword(ctx, req.Identifier, req.Password)
 	if err != nil {
 		status := mapAuthError(err)
 		writeJSON(w, status, errorResponse{err.Error()})
@@ -101,7 +96,7 @@ func (h *AuthHandler) refreshToken(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorResponse{"invalid request"})
 		return
 	}
-	at, err := h.authUC.RefreshToken(ctx, req.RefreshJTI)
+	at, err := h.authUC.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, errorResponse{err.Error()})
 		return

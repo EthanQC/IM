@@ -24,6 +24,7 @@ type MessageUseCaseImpl struct {
 	msgRepo     out.MessageRepository
 	seqRepo     out.SequenceRepository
 	inboxRepo   out.InboxRepository
+	memberRepo  out.ConversationMemberRepository
 	eventPub    out.EventPublisher
 }
 
@@ -33,17 +34,23 @@ func NewMessageUseCaseImpl(
 	msgRepo out.MessageRepository,
 	seqRepo out.SequenceRepository,
 	inboxRepo out.InboxRepository,
+	memberRepo out.ConversationMemberRepository,
 	eventPub out.EventPublisher,
 ) *MessageUseCaseImpl {
 	return &MessageUseCaseImpl{
 		msgRepo:   msgRepo,
 		seqRepo:   seqRepo,
 		inboxRepo: inboxRepo,
+		memberRepo: memberRepo,
 		eventPub:  eventPub,
 	}
 }
 
 func (uc *MessageUseCaseImpl) SendMessage(ctx context.Context, req *in.SendMessageRequest) (*entity.Message, error) {
+	if uc.memberRepo == nil {
+		return nil, fmt.Errorf("member repository not configured")
+	}
+
 	// 幂等检查
 	existingMsg, err := uc.msgRepo.GetByClientMsgID(ctx, req.SenderID, req.ClientMsgID)
 	if err != nil {
@@ -51,6 +58,23 @@ func (uc *MessageUseCaseImpl) SendMessage(ctx context.Context, req *in.SendMessa
 	}
 	if existingMsg != nil {
 		return existingMsg, nil // 返回已存在的消息，实现幂等
+	}
+
+	// 获取会话成员并校验身份
+	memberIDs, err := uc.memberRepo.ListMemberIDs(ctx, req.ConversationID)
+	if err != nil {
+		return nil, fmt.Errorf("get conversation members: %w", err)
+	}
+
+	isMember := false
+	for _, memberID := range memberIDs {
+		if memberID == req.SenderID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return nil, fmt.Errorf("sender not in conversation")
 	}
 
 	// 获取下一个序号
@@ -78,6 +102,28 @@ func (uc *MessageUseCaseImpl) SendMessage(ctx context.Context, req *in.SendMessa
 		return nil, fmt.Errorf("create message: %w", err)
 	}
 
+	// 更新收件箱
+	for _, memberID := range memberIDs {
+		if _, err := uc.inboxRepo.GetOrCreate(ctx, memberID, req.ConversationID); err != nil {
+			return nil, fmt.Errorf("ensure inbox: %w", err)
+		}
+		if err := uc.inboxRepo.UpdateLastDelivered(ctx, memberID, req.ConversationID, seq); err != nil {
+			return nil, fmt.Errorf("update delivered seq: %w", err)
+		}
+		if memberID == req.SenderID {
+			if err := uc.inboxRepo.UpdateLastRead(ctx, memberID, req.ConversationID, seq); err != nil {
+				return nil, fmt.Errorf("update read seq: %w", err)
+			}
+			if err := uc.inboxRepo.ClearUnread(ctx, memberID, req.ConversationID); err != nil {
+				return nil, fmt.Errorf("clear unread: %w", err)
+			}
+			continue
+		}
+		if err := uc.inboxRepo.IncrUnread(ctx, memberID, req.ConversationID, 1); err != nil {
+			return nil, fmt.Errorf("incr unread: %w", err)
+		}
+	}
+
 	// 发布消息发送事件
 	if uc.eventPub != nil {
 		contentBytes, _ := json.Marshal(msg.Content)
@@ -85,6 +131,7 @@ func (uc *MessageUseCaseImpl) SendMessage(ctx context.Context, req *in.SendMessa
 			MessageID:      msg.ID,
 			ConversationID: msg.ConversationID,
 			SenderID:       msg.SenderID,
+			ReceiverIDs:    memberIDs,
 			Seq:            msg.Seq,
 			ContentType:    int8(msg.ContentType),
 			Content:        string(contentBytes),
@@ -136,9 +183,22 @@ func (uc *MessageUseCaseImpl) UpdateRead(ctx context.Context, userID, conversati
 
 	// 发布已读事件
 	if uc.eventPub != nil {
+		receiverIDs := []uint64{}
+		if uc.memberRepo != nil {
+			members, err := uc.memberRepo.ListMemberIDs(ctx, conversationID)
+			if err == nil {
+				for _, memberID := range members {
+					if memberID == userID {
+						continue
+					}
+					receiverIDs = append(receiverIDs, memberID)
+				}
+			}
+		}
 		event := &out.MessageReadEvent{
 			UserID:         userID,
 			ConversationID: conversationID,
+			ReceiverIDs:    receiverIDs,
 			ReadSeq:        readSeq,
 			ReadAt:         time.Now().Unix(),
 		}
@@ -176,10 +236,18 @@ func (uc *MessageUseCaseImpl) RevokeMessage(ctx context.Context, userID, message
 
 	// 发布撤回事件
 	if uc.eventPub != nil {
+		receiverIDs := []uint64{}
+		if uc.memberRepo != nil {
+			members, err := uc.memberRepo.ListMemberIDs(ctx, msg.ConversationID)
+			if err == nil {
+				receiverIDs = append(receiverIDs, members...)
+			}
+		}
 		event := &out.MessageRevokedEvent{
 			MessageID:      msg.ID,
 			ConversationID: msg.ConversationID,
 			SenderID:       msg.SenderID,
+			ReceiverIDs:    receiverIDs,
 			RevokedAt:      time.Now().Unix(),
 		}
 		if err := uc.eventPub.PublishMessageRevoked(ctx, event); err != nil {

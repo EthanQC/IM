@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"strconv"
+	"time"
 
 	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
 	"github.com/EthanQC/IM/services/identity_service/internal/domain/entity"
@@ -19,11 +20,12 @@ type AuthServer struct {
 	imv1.UnimplementedIdentityServiceServer
 	AuthUC in.AuthUseCase
 	UserUC in.UserUseCase
+	ContactUC in.ContactUseCase
 	SMSUC  in.SMSUseCase
 }
 
-func NewAuthServer(authUC in.AuthUseCase, userUC in.UserUseCase, smsUC in.SMSUseCase) *AuthServer {
-	return &AuthServer{AuthUC: authUC, UserUC: userUC, SMSUC: smsUC}
+func NewAuthServer(authUC in.AuthUseCase, userUC in.UserUseCase, contactUC in.ContactUseCase, smsUC in.SMSUseCase) *AuthServer {
+	return &AuthServer{AuthUC: authUC, UserUC: userUC, ContactUC: contactUC, SMSUC: smsUC}
 }
 
 func (s *AuthServer) Register(ctx context.Context, req *imv1.RegisterRequest) (*imv1.AuthResponse, error) {
@@ -34,7 +36,7 @@ func (s *AuthServer) Register(ctx context.Context, req *imv1.RegisterRequest) (*
 	}
 
 	// 注册成功后自动登录获取 token
-	_, token, err := s.UserUC.Login(ctx, req.Username, req.Password)
+	at, err := s.AuthUC.LoginByPassword(ctx, req.Username, req.Password)
 	if err != nil {
 		// 注册成功但登录失败，返回用户信息但没有 token
 		return &imv1.AuthResponse{
@@ -50,9 +52,9 @@ func (s *AuthServer) Register(ctx context.Context, req *imv1.RegisterRequest) (*
 	}
 
 	return &imv1.AuthResponse{
-		AccessToken:  token,
-		RefreshToken: "",  // MVP 简化
-		ExpiresIn:    900, // 15分钟
+		AccessToken:  at.AccessToken,
+		RefreshToken: at.RefreshToken,
+		ExpiresIn:    expiresInSeconds(at),
 		Profile: &imv1.UserProfile{
 			User: &imv1.UserBrief{
 				Id:          int64(user.ID),
@@ -65,16 +67,28 @@ func (s *AuthServer) Register(ctx context.Context, req *imv1.RegisterRequest) (*
 }
 
 func (s *AuthServer) Login(ctx context.Context, req *imv1.LoginRequest) (*imv1.AuthResponse, error) {
-	// 使用 UserUseCase.Login（更简洁的实现）
-	user, token, err := s.UserUC.Login(ctx, req.Username, req.Password)
+	at, err := s.AuthUC.LoginByPassword(ctx, req.Username, req.Password)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "login failed: %v", err)
 	}
 
+	userID, err := strconv.ParseUint(at.UserID, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "invalid user id: %v", err)
+	}
+
+	user, err := s.UserUC.GetProfile(ctx, userID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get profile failed: %v", err)
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.NotFound, "user not found")
+	}
+
 	return &imv1.AuthResponse{
-		AccessToken:  token,
-		RefreshToken: "",  // MVP 简化
-		ExpiresIn:    900, // 15分钟
+		AccessToken:  at.AccessToken,
+		RefreshToken: at.RefreshToken,
+		ExpiresIn:    expiresInSeconds(at),
 		Profile: &imv1.UserProfile{
 			User: &imv1.UserBrief{
 				Id:          int64(user.ID),
@@ -137,20 +151,9 @@ func (s *AuthServer) GetProfile(ctx context.Context, req *imv1.GetProfileRequest
 }
 
 func (s *AuthServer) UpdateProfile(ctx context.Context, req *imv1.UpdateProfileRequest) (*imv1.UserProfile, error) {
-	// 从 gRPC metadata 获取 user_id
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "missing metadata")
-	}
-
-	userIDStrs := md.Get("user_id")
-	if len(userIDStrs) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "user_id required")
-	}
-
-	userID, err := strconv.ParseUint(userIDStrs[0], 10, 64)
+	userID, err := getUserIDFromContext(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id")
+		return nil, err
 	}
 
 	// 处理 avatar_url（转换为指针）
@@ -192,28 +195,110 @@ func (s *AuthServer) UpdateProfile(ctx context.Context, req *imv1.UpdateProfileR
 	}, nil
 }
 
-func (s *AuthServer) ApplyContact(context.Context, *imv1.ApplyContactRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, status.Errorf(codes.Unimplemented, "contacts not implemented")
+func (s *AuthServer) ApplyContact(ctx context.Context, req *imv1.ApplyContactRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var remark *string
+	if req.Remark != "" {
+		remark = &req.Remark
+	}
+
+	if err := s.ContactUC.ApplyContact(ctx, userID, uint64(req.TargetUserId), remark); err != nil {
+		return nil, status.Errorf(codes.Internal, "apply contact failed: %v", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *AuthServer) RespondContact(context.Context, *imv1.RespondContactRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, status.Errorf(codes.Unimplemented, "contacts not implemented")
+func (s *AuthServer) RespondContact(ctx context.Context, req *imv1.RespondContactRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ContactUC.RespondContact(ctx, uint64(req.TargetUserId), userID, req.Accept); err != nil {
+		return nil, status.Errorf(codes.Internal, "respond contact failed: %v", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *AuthServer) RemoveContact(context.Context, *imv1.RemoveContactRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, status.Errorf(codes.Unimplemented, "contacts not implemented")
+func (s *AuthServer) RemoveContact(ctx context.Context, req *imv1.RemoveContactRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ContactUC.RemoveContact(ctx, userID, uint64(req.TargetUserId)); err != nil {
+		return nil, status.Errorf(codes.Internal, "remove contact failed: %v", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *AuthServer) AddToBlacklist(context.Context, *imv1.BlacklistRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, status.Errorf(codes.Unimplemented, "blacklist not implemented")
+func (s *AuthServer) AddToBlacklist(ctx context.Context, req *imv1.BlacklistRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ContactUC.AddToBlacklist(ctx, userID, uint64(req.UserId)); err != nil {
+		return nil, status.Errorf(codes.Internal, "add to blacklist failed: %v", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *AuthServer) RemoveFromBlacklist(context.Context, *imv1.BlacklistRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, status.Errorf(codes.Unimplemented, "blacklist not implemented")
+func (s *AuthServer) RemoveFromBlacklist(ctx context.Context, req *imv1.BlacklistRequest) (*emptypb.Empty, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ContactUC.RemoveFromBlacklist(ctx, userID, uint64(req.UserId)); err != nil {
+		return nil, status.Errorf(codes.Internal, "remove from blacklist failed: %v", err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
-func (s *AuthServer) ListContacts(context.Context, *imv1.ListContactsRequest) (*imv1.ListContactsResponse, error) {
-	return &imv1.ListContactsResponse{}, status.Errorf(codes.Unimplemented, "contacts not implemented")
+func (s *AuthServer) ListContacts(ctx context.Context, req *imv1.ListContactsRequest) (*imv1.ListContactsResponse, error) {
+	userID, err := getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	page := int(req.Page)
+	pageSize := int(req.PageSize)
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 50
+	}
+
+	contacts, total, err := s.ContactUC.ListContacts(ctx, userID, page, pageSize)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list contacts failed: %v", err)
+	}
+
+	resp := &imv1.ListContactsResponse{Total: int32(total)}
+	for _, contact := range contacts {
+		user, err := s.UserUC.GetProfile(ctx, contact.FriendID)
+		if err != nil || user == nil {
+			continue
+		}
+
+		avatarURL := ""
+		if user.AvatarURL != nil {
+			avatarURL = *user.AvatarURL
+		}
+		resp.Contacts = append(resp.Contacts, &imv1.UserBrief{
+			Id:          int64(user.ID),
+			Username:    user.Username,
+			DisplayName: user.DisplayName,
+			AvatarUrl:   avatarURL,
+		})
+	}
+	return resp, nil
 }
 
 // RegisterServer registers the gRPC server implementation.
@@ -225,7 +310,39 @@ func (s *AuthServer) toAuthResp(at *entity.AuthToken) *imv1.AuthResponse {
 	return &imv1.AuthResponse{
 		AccessToken:  at.AccessToken,
 		RefreshToken: at.RefreshToken,
-		ExpiresIn:    int64(at.RefreshExpiresAt.Sub(at.CreatedAt).Seconds()),
+		ExpiresIn:    expiresInSeconds(at),
 		Profile:      &imv1.UserProfile{},
 	}
+}
+
+func expiresInSeconds(at *entity.AuthToken) int64 {
+	if at == nil {
+		return 0
+	}
+	if at.ExpiresAt.IsZero() {
+		return 0
+	}
+	ttl := time.Until(at.ExpiresAt).Seconds()
+	if ttl < 0 {
+		return 0
+	}
+	return int64(ttl)
+}
+
+func getUserIDFromContext(ctx context.Context) (uint64, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, status.Errorf(codes.InvalidArgument, "missing metadata")
+	}
+
+	userIDStrs := md.Get("user_id")
+	if len(userIDStrs) == 0 {
+		return 0, status.Errorf(codes.InvalidArgument, "user_id required")
+	}
+
+	userID, err := strconv.ParseUint(userIDStrs[0], 10, 64)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "invalid user_id")
+	}
+	return userID, nil
 }

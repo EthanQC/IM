@@ -68,6 +68,20 @@ CREATE TABLE IF NOT EXISTS blacklist (
     CONSTRAINT fk_blacklist_blocked FOREIGN KEY (blocked_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单表';
 
+-- 刷新令牌表
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id VARCHAR(64) PRIMARY KEY COMMENT 'token id/jti',
+    user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
+    access_token TEXT DEFAULT NULL COMMENT '最新 access token',
+    refresh_token TEXT NOT NULL COMMENT '刷新令牌',
+    refresh_expires_at TIMESTAMP NOT NULL COMMENT '刷新令牌过期时间',
+    is_revoked TINYINT NOT NULL DEFAULT 0 COMMENT '是否撤销: 0=否,1=是',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_user (user_id),
+    KEY idx_refresh_exp (refresh_expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='刷新令牌表';
+
 -- ============================================
 -- 会话域 (Conversation Service)
 -- ============================================
@@ -192,6 +206,22 @@ CREATE TABLE IF NOT EXISTS inbox (
     CONSTRAINT fk_inbox_conv FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户收件箱表';
 
+-- 待投递消息表
+CREATE TABLE IF NOT EXISTS pending_messages (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    message_id BIGINT UNSIGNED NOT NULL,
+    conversation_id BIGINT UNSIGNED NOT NULL,
+    payload TEXT NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '投递状态: 0=待投递,1=已投递,2=失败,3=过期',
+    retry_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    delivered_at TIMESTAMP NULL DEFAULT NULL,
+    KEY idx_user_status (user_id, status),
+    KEY idx_conv (conversation_id),
+    CONSTRAINT fk_pending_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='待投递消息表';
+
 -- Outbox 事务消息表（用于 Kafka 外发）
 CREATE TABLE IF NOT EXISTS outbox (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -224,13 +254,18 @@ CREATE TABLE IF NOT EXISTS attachments (
     uploader_id BIGINT UNSIGNED NOT NULL,
     size_bytes BIGINT UNSIGNED NOT NULL COMMENT '文件大小(字节)',
     content_type VARCHAR(128) NOT NULL COMMENT 'MIME类型',
+    kind VARCHAR(16) NOT NULL DEFAULT 'file' COMMENT '文件类型: image/file/audio/video',
+    bucket VARCHAR(64) NOT NULL COMMENT '对象存储桶',
+    url TEXT DEFAULT NULL COMMENT '下载地址',
+    thumbnail VARCHAR(255) DEFAULT NULL COMMENT '缩略图对象key',
     md5 CHAR(32) DEFAULT NULL COMMENT '文件MD5',
     width INT DEFAULT NULL COMMENT '图片/视频宽度',
     height INT DEFAULT NULL COMMENT '图片/视频高度',
     duration INT DEFAULT NULL COMMENT '音视频时长(秒)',
     metadata JSON NULL COMMENT '扩展元数据',
-    status TINYINT NOT NULL DEFAULT 1 COMMENT '文件状态: 0=已删除,1=正常',
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '文件状态: 0=待上传,1=已上传,2=已确认,3=已删除',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_uploader (uploader_id),
     KEY idx_created (created_at),
     KEY idx_status (status),

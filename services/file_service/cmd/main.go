@@ -14,10 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
 	grpcServer "github.com/EthanQC/IM/services/file_service/internal/adapters/in/grpc"
 	minioAdapter "github.com/EthanQC/IM/services/file_service/internal/adapters/out/minio"
 	mysqlRepo "github.com/EthanQC/IM/services/file_service/internal/adapters/out/mysql"
@@ -67,6 +69,18 @@ func main() {
 		viper.GetString("server.callback_url"),
 	)
 
+	// 初始化消息服务客户端
+	msgAddr := viper.GetString("grpc.message_addr")
+	if msgAddr == "" {
+		log.Fatalf("message service address is required")
+	}
+	msgConn, err := grpc.Dial(msgAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect message service: %v", err)
+	}
+	defer msgConn.Close()
+	messageClient := imv1.NewMessageServiceClient(msgConn)
+
 	// 启动HTTP服务器（用于文件上传回调）
 	router := gin.Default()
 	router.POST("/callback/upload", func(c *gin.Context) {
@@ -97,7 +111,7 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	fileServer := grpcServer.NewFileServer(fileUseCase)
+	fileServer := grpcServer.NewFileServer(fileUseCase, messageClient)
 	grpcServer.RegisterFileServiceServer(server, fileServer)
 
 	go func() {
@@ -145,6 +159,11 @@ func initDB() (*gorm.DB, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if viper.GetString("server.mode") != "release" {
+		if err := database.AutoMigrate(&mysqlRepo.FileModel{}); err != nil {
+			return nil, err
+		}
 	}
 
 	sqlDB, err := database.DB()

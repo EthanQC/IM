@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/EthanQC/IM/services/identity_service/internal/domain/entity"
 	"github.com/EthanQC/IM/services/identity_service/internal/ports/out"
 	"github.com/EthanQC/IM/services/identity_service/pkg/jwt"
@@ -34,13 +36,26 @@ func NewRefreshTokenUseCase(
 }
 
 // Execute 用旧 RefreshToken 颁发新一对 Access/Refresh Token，并返回新的 Token 记录
-func (uc *RefreshTokenUseCase) Execute(ctx context.Context, oldJTI string) (*entity.AuthToken, error) {
+func (uc *RefreshTokenUseCase) Execute(ctx context.Context, refreshToken string) (*entity.AuthToken, error) {
+	claims, err := uc.JWTManager.Parse(refreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	oldJTI := claims.Id
+	if oldJTI == "" {
+		return nil, fmt.Errorf("missing refresh token id")
+	}
+
 	rec, err := uc.RefreshRepo.Find(ctx, oldJTI)
 	if err != nil {
 		return nil, fmt.Errorf("查询 RefreshToken 失败: %w", err)
 	}
 	if rec == nil || rec.IsRevoked {
 		return nil, fmt.Errorf("无效或已撤销的 RefreshToken")
+	}
+	if rec.RefreshToken == "" || rec.RefreshToken != refreshToken {
+		return nil, fmt.Errorf("RefreshToken 不匹配")
 	}
 	if time.Now().After(rec.RefreshExpiresAt) {
 		return nil, fmt.Errorf("RefreshToken 已过期")
@@ -59,7 +74,7 @@ func (uc *RefreshTokenUseCase) Execute(ctx context.Context, oldJTI string) (*ent
 	}
 
 	at := entity.NewAuthToken(rec.UserID)
-	at.ID = rec.ID
+	at.ID = uuid.New().String()
 	at.RefreshExpiresAt = time.Now().Add(uc.RefreshTTL)
 
 	accessToken, err := uc.JWTManager.Generate(at.ID, rec.UserID, uc.AccessTTL)
@@ -67,8 +82,9 @@ func (uc *RefreshTokenUseCase) Execute(ctx context.Context, oldJTI string) (*ent
 		return nil, fmt.Errorf("生成新 AccessToken 失败: %w", err)
 	}
 	at.AccessToken = accessToken
+	at.ExpiresAt = time.Now().Add(uc.AccessTTL)
 
-	refreshToken, err := uc.JWTManager.Generate(at.ID, rec.UserID, uc.RefreshTTL)
+	refreshToken, err = uc.JWTManager.Generate(at.ID, rec.UserID, uc.RefreshTTL)
 	if err != nil {
 		return nil, fmt.Errorf("生成新 RefreshToken 失败: %w", err)
 	}

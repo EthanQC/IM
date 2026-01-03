@@ -19,13 +19,18 @@ type FileModel struct {
 	UploaderID   uint64    `gorm:"column:uploader_id;not null;index"`
 	SizeBytes    int64     `gorm:"column:size_bytes;not null"`
 	ContentType  string    `gorm:"column:content_type;type:varchar(128);not null"`
+	Kind         string    `gorm:"column:kind;type:varchar(16);not null"`
+	Bucket       string    `gorm:"column:bucket;type:varchar(64);not null"`
+	URL          string    `gorm:"column:url;type:text"`
+	Thumbnail    string    `gorm:"column:thumbnail;type:varchar(255)"`
 	MD5          string    `gorm:"column:md5;type:char(32)"`
 	Width        int32     `gorm:"column:width"`
 	Height       int32     `gorm:"column:height"`
 	Duration     int32     `gorm:"column:duration"`
 	Metadata     *string   `gorm:"column:metadata;type:json"`
-	Status       int8      `gorm:"column:status;default:1"`
+	Status       int8      `gorm:"column:status;default:0"`
 	CreatedAt    time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 func (FileModel) TableName() string {
@@ -39,12 +44,17 @@ func (m *FileModel) toEntity() *entity.FileUpload {
 		ObjectKey:   m.ObjectKey,
 		FileName:    m.OriginalName,
 		ContentType: m.ContentType,
+		Kind:        entity.FileKind(m.Kind),
+		Bucket:      m.Bucket,
+		URL:         m.URL,
+		Thumbnail:   m.Thumbnail,
 		SizeBytes:   m.SizeBytes,
 		Status:      entity.FileStatus(m.Status),
 		Width:       m.Width,
 		Height:      m.Height,
 		Duration:    m.Duration,
 		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
 	}
 }
 
@@ -64,6 +74,10 @@ func (r *FileRepositoryMySQL) Create(ctx context.Context, file *entity.FileUploa
 		UploaderID:   file.UserID,
 		SizeBytes:    file.SizeBytes,
 		ContentType:  file.ContentType,
+		Kind:         string(file.Kind),
+		Bucket:       file.Bucket,
+		URL:          file.URL,
+		Thumbnail:    file.Thumbnail,
 		Status:       int8(file.Status),
 		Width:        file.Width,
 		Height:       file.Height,
@@ -116,6 +130,8 @@ func (r *FileRepositoryMySQL) Update(ctx context.Context, file *entity.FileUploa
 		Where("id = ?", file.ID).
 		Updates(map[string]interface{}{
 			"status":    int8(file.Status),
+			"kind":      string(file.Kind),
+			"bucket":    file.Bucket,
 			"url":       file.URL,
 			"thumbnail": file.Thumbnail,
 			"width":     file.Width,

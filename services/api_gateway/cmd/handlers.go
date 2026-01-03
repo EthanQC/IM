@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -90,16 +91,21 @@ func (g *Gateway) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 从claims中提取user_id（存在 jti 字段中）
-		if jti, ok := claims["jti"].(string); ok {
-			// jti 是 user_id 的字符串形式
-			var userID uint64
-			fmt.Sscanf(jti, "%d", &userID)
+	// 从claims中提取user_id（存在 jti 字段中）
+	if sub, ok := claims["sub"].(string); ok {
+		userID, err := strconv.ParseUint(sub, 10, 64)
+		if err == nil {
 			c.Set("user_id", userID)
 		}
-
-		c.Next()
+	} else if jti, ok := claims["jti"].(string); ok {
+		// 兼容旧 token: jti 里存 user_id
+		var userID uint64
+		fmt.Sscanf(jti, "%d", &userID)
+		c.Set("user_id", userID)
 	}
+
+	c.Next()
+}
 }
 
 // ctxWithUserID 创建带有 user_id metadata 的 gRPC 上下文
@@ -262,7 +268,7 @@ func (g *Gateway) handleUpdateProfile(c *gin.Context) {
 // ==================== 联系人相关 Handler ====================
 
 func (g *Gateway) handleGetContacts(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	resp, err := g.identityClient.ListContacts(ctx, &imv1.ListContactsRequest{Page: 1, PageSize: 100})
@@ -283,7 +289,7 @@ func (g *Gateway) handleApplyContact(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	_, err := g.identityClient.ApplyContact(ctx, &imv1.ApplyContactRequest{
@@ -307,7 +313,7 @@ func (g *Gateway) handleContactApply(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	ctx, cancel := g.ctxWithUserID(c)
 	defer cancel()
 
 	_, err := g.identityClient.RespondContact(ctx, &imv1.RespondContactRequest{
@@ -322,7 +328,21 @@ func (g *Gateway) handleContactApply(c *gin.Context) {
 }
 
 func (g *Gateway) handleDeleteContact(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "not implemented"})
+	targetID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid contact id"})
+		return
+	}
+
+	ctx, cancel := g.ctxWithUserID(c)
+	defer cancel()
+
+	_, err = g.identityClient.RemoveContact(ctx, &imv1.RemoveContactRequest{TargetUserId: int64(targetID)})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 }
 
 // ==================== 会话相关 Handler ====================
@@ -371,11 +391,57 @@ func (g *Gateway) handleCreateConversation(c *gin.Context) {
 }
 
 func (g *Gateway) handleGetConversation(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "not implemented"})
+	convID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || convID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid conversation id"})
+		return
+	}
+
+	ctx, cancel := g.ctxWithUserID(c)
+	defer cancel()
+
+	resp, err := g.conversationClient.ListMyConversations(ctx, &imv1.ListMyConversationsRequest{Page: 1, PageSize: 100})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	for _, item := range resp.Items {
+		if item.Id == convID {
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
 }
 
 func (g *Gateway) handleUpdateConversation(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "not implemented"})
+	convID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || convID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid conversation id"})
+		return
+	}
+
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	ctx, cancel := g.ctxWithUserID(c)
+	defer cancel()
+
+	resp, err := g.conversationClient.UpdateConversation(ctx, &imv1.UpdateConversationRequest{
+		ConversationId: convID,
+		Title:          req.Title,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": resp})
 }
 
 // ==================== 消息相关 Handler ====================
@@ -469,7 +535,41 @@ func (g *Gateway) handleMarkRead(c *gin.Context) {
 }
 
 func (g *Gateway) handleRevokeMessage(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "not implemented"})
+	msgID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || msgID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid message id"})
+		return
+	}
+	if g.cfg.Server.HttpAddrMessage == "" {
+		c.JSON(http.StatusFailedDependency, gin.H{"error": "message http addr not configured"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), g.timeout)
+	defer cancel()
+
+	url := fmt.Sprintf("%s/api/v1/messages/%d/revoke", g.cfg.Server.HttpAddrMessage, msgID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	req.Header.Set("X-User-ID", strconv.FormatUint(c.GetUint64("user_id"), 10))
+
+	client := &http.Client{Timeout: g.timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	payload, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(resp.StatusCode, gin.H{"error": string(payload)})
+		return
+	}
+	c.Data(resp.StatusCode, "application/json", payload)
 }
 
 // ==================== 在线状态 Handler ====================

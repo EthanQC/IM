@@ -18,11 +18,12 @@ import (
 type FileServer struct {
 	pb.UnimplementedFileServiceServer
 	fileUseCase in.FileUseCase
+	messageClient pb.MessageServiceClient
 }
 
 // NewFileServer 创建文件服务
-func NewFileServer(fileUseCase in.FileUseCase) *FileServer {
-	return &FileServer{fileUseCase: fileUseCase}
+func NewFileServer(fileUseCase in.FileUseCase, messageClient pb.MessageServiceClient) *FileServer {
+	return &FileServer{fileUseCase: fileUseCase, messageClient: messageClient}
 }
 
 // RegisterFileServiceServer 注册服务
@@ -90,6 +91,9 @@ func (s *FileServer) CompleteUpload(ctx context.Context, req *pb.CompleteUploadR
 	if req.Media == nil {
 		return nil, status.Error(codes.InvalidArgument, "media is required")
 	}
+	if req.ConversationId == 0 || req.ClientMsgId == "" {
+		return nil, status.Error(codes.InvalidArgument, "conversation_id and client_msg_id are required")
+	}
 
 	file, err := s.fileUseCase.CompleteUpload(ctx, &in.CompleteUploadInput{
 		UserID:         userID,
@@ -105,20 +109,45 @@ func (s *FileServer) CompleteUpload(ctx context.Context, req *pb.CompleteUploadR
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	if s.messageClient == nil {
+		return nil, status.Error(codes.FailedPrecondition, "message service not configured")
+	}
+
+	contentType, body := buildMessageBody(file)
+	msgCtx := metadata.AppendToOutgoingContext(ctx, "user_id", strconv.FormatUint(userID, 10))
+	msgResp, err := s.messageClient.SendMessage(msgCtx, &pb.SendMessageRequest{
+		ConversationId: req.ConversationId,
+		ClientMsgId:    req.ClientMsgId,
+		ContentType:    contentType,
+		Body:           body,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	return &pb.CompleteUploadResponse{
-		Message: &pb.MessageItem{
-			Body: &pb.MessageBody{
-				Body: &pb.MessageBody_File{
-					File: &pb.MediaRef{
-						ObjectKey:    file.ObjectKey,
-						Filename:     file.FileName,
-						ContentType:  file.ContentType,
-						SizeBytes:    file.SizeBytes,
-						DurationSec:  file.Duration,
-						ThumbnailKey: file.Thumbnail,
-					},
-				},
-			},
-		},
+		Message: msgResp.Message,
 	}, nil
+}
+
+func buildMessageBody(file *entity.FileUpload) (pb.MessageContentType, *pb.MessageBody) {
+	media := &pb.MediaRef{
+		ObjectKey:    file.ObjectKey,
+		Filename:     file.FileName,
+		ContentType:  file.ContentType,
+		SizeBytes:    file.SizeBytes,
+		DurationSec:  file.Duration,
+		ThumbnailKey: file.Thumbnail,
+	}
+
+	switch file.Kind {
+	case entity.FileKindImage:
+		return pb.MessageContentType_MESSAGE_CONTENT_TYPE_IMAGE, &pb.MessageBody{Body: &pb.MessageBody_Image{Image: media}}
+	case entity.FileKindAudio:
+		return pb.MessageContentType_MESSAGE_CONTENT_TYPE_AUDIO, &pb.MessageBody{Body: &pb.MessageBody_Audio{Audio: media}}
+	case entity.FileKindVideo:
+		return pb.MessageContentType_MESSAGE_CONTENT_TYPE_VIDEO, &pb.MessageBody{Body: &pb.MessageBody_Video{Video: media}}
+	default:
+		return pb.MessageContentType_MESSAGE_CONTENT_TYPE_FILE, &pb.MessageBody{Body: &pb.MessageBody_File{File: media}}
+	}
 }

@@ -8,22 +8,27 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/in/grpc/server"
 	httpAdapter "github.com/EthanQC/IM/services/message_service/internal/adapters/in/http"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/in/ws"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/out/db"
+	grpcOut "github.com/EthanQC/IM/services/message_service/internal/adapters/out/grpc"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/out/mq"
 	"github.com/EthanQC/IM/services/message_service/internal/application"
+	"github.com/EthanQC/IM/services/message_service/internal/ports/out"
 )
 
 func main() {
@@ -50,11 +55,29 @@ func main() {
 	sequenceRepo := db.NewSequenceRepositoryMySQL(database)
 	inboxRepo := db.NewInboxRepositoryMySQL(database)
 
+	// 初始化会话成员仓储（gRPC）
+	var memberRepo out.ConversationMemberRepository
+	convAddr := viper.GetString("grpc.conversation_addr")
+	if convAddr == "" {
+		log.Fatalf("conversation service address is required")
+	}
+	convTimeout := viper.GetDuration("grpc.timeout")
+	if convTimeout == 0 {
+		convTimeout = 3 * time.Second
+	}
+	convConn, err := grpc.Dial(convAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect conversation service: %v", err)
+	}
+	defer convConn.Close()
+	memberRepo = grpcOut.NewConversationClient(imv1.NewConversationServiceClient(convConn), convTimeout)
+
 	// 初始化应用层
 	messageUseCase := application.NewMessageUseCaseImpl(
 		messageRepo,
 		sequenceRepo,
 		inboxRepo,
+		memberRepo,
 		eventPublisher,
 	)
 
@@ -64,6 +87,14 @@ func main() {
 
 	// 初始化HTTP服务器
 	router := gin.Default()
+	router.Use(func(c *gin.Context) {
+		if userIDStr := c.GetHeader("X-User-ID"); userIDStr != "" {
+			if userID, err := strconv.ParseUint(userIDStr, 10, 64); err == nil {
+				c.Set("user_id", userID)
+			}
+		}
+		c.Next()
+	})
 	chatController := httpAdapter.NewChatController(messageUseCase)
 	apiGroup := router.Group("/api/v1")
 	chatController.RegisterRoutes(apiGroup)
