@@ -23,6 +23,7 @@ import (
 	"github.com/EthanQC/IM/services/delivery_service/internal/adapters/out/mq"
 	redisRepo "github.com/EthanQC/IM/services/delivery_service/internal/adapters/out/redis"
 	"github.com/EthanQC/IM/services/delivery_service/internal/application"
+	"github.com/EthanQC/IM/services/delivery_service/internal/ports/in"
 )
 
 func main() {
@@ -43,12 +44,17 @@ func main() {
 		log.Fatalf("Failed to init redis: %v", err)
 	}
 
-	// 初始化仓储
-	onlineUserRepo := redisRepo.NewOnlineUserRepositoryRedis(redisClient)
-	pendingMsgRepo := db.NewPendingMessageRepositoryMySQL(database)
+	// 获取服务器地址（用于路由）
+	serverAddr := fmt.Sprintf("%s:%d", getHostname(), viper.GetInt("server.http_port"))
 
-	// 初始化连接管理器
-	connManager := ws.NewConnectionManager().(*ws.ConnectionManagerImpl)
+	// 初始化仓储
+	onlineUserRepo := redisRepo.NewEnhancedOnlineUserRepositoryRedis(redisClient, serverAddr)
+	pendingMsgRepo := db.NewPendingMessageRepositoryMySQL(database)
+	syncStateRepo := redisRepo.NewSyncStateRepositoryRedis(redisClient)
+	pendingAckRepo := redisRepo.NewPendingAckRepositoryRedis(redisClient)
+
+	// 初始化增强版连接管理器
+	connManager := ws.NewEnhancedConnectionManager()
 
 	// 初始化用例层
 	deliveryUseCase := application.NewDeliveryUseCase(
@@ -57,15 +63,34 @@ func main() {
 		connManager,
 		nil, // PushService 暂时不实现
 	)
+
+	// 设置待确认仓储
+	if duc, ok := deliveryUseCase.(*application.DeliveryUseCaseImpl); ok {
+		duc.SetPendingAckRepo(pendingAckRepo)
+	}
+
 	connUseCase := application.NewConnectionUseCase(onlineUserRepo, deliveryUseCase)
 
-	// 设置连接用例
-	connManager.SetConnectionUseCase(connUseCase)
+	// 初始化同步用例（需要消息查询仓储，这里暂时设为nil）
+	var syncUseCase in.SyncUseCase // 需要 message_service 的仓储，跨服务调用
 
-	// 初始化Kafka消费者
+	// 初始化ACK用例
+	ackUseCase := application.NewAckUseCase(pendingAckRepo, syncStateRepo, connManager)
+
+	// 初始化WebRTC信令用例
+	signalingConfig := application.SignalingConfig{
+		STUNServers: viper.GetStringSlice("webrtc.stun_servers"),
+		TURNServers: []in.TURNServer{}, // 可从配置读取
+	}
+	if len(signalingConfig.STUNServers) == 0 {
+		signalingConfig.STUNServers = []string{"stun:stun.l.google.com:19302"}
+	}
+	signalingUseCase := application.NewSignalingUseCase(signalingConfig, connManager)
+
+	// 初始化Kafka消费者（使用可靠消费者）
 	kafkaBrokers := viper.GetStringSlice("kafka.brokers")
 	groupID := viper.GetString("kafka.group_id")
-	consumer, err := mq.NewKafkaMessageConsumer(kafkaBrokers, groupID, deliveryUseCase)
+	consumer, err := mq.NewReliableKafkaConsumer(kafkaBrokers, groupID, deliveryUseCase)
 	if err != nil {
 		log.Fatalf("Failed to init kafka consumer: %v", err)
 	}
@@ -77,12 +102,18 @@ func main() {
 		log.Fatalf("Failed to start kafka consumer: %v", err)
 	}
 
-	// 初始化WebSocket服务器
-	wsServer := ws.NewWSServer(connManager, connUseCase)
+	// 初始化增强版WebSocket服务器
+	wsServer := ws.NewEnhancedWSServer(
+		connManager,
+		connUseCase,
+		syncUseCase,
+		ackUseCase,
+		signalingUseCase,
+	)
 
 	// 初始化HTTP服务器
 	router := gin.Default()
-	
+
 	// WebSocket端点
 	router.GET("/ws", func(c *gin.Context) {
 		// 从JWT或Query中获取用户信息
@@ -99,7 +130,7 @@ func main() {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		
+
 		deviceID := c.Query("device_id")
 		if deviceID == "" {
 			deviceID = "default"
@@ -108,13 +139,18 @@ func main() {
 		if platform == "" {
 			platform = "web"
 		}
-		
+
 		wsServer.HandleConnection(c.Writer, c.Request, userID, deviceID, platform)
 	})
 
 	// 健康检查
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// 统计信息
+	router.GET("/stats", func(c *gin.Context) {
+		c.JSON(http.StatusOK, wsServer.GetStats())
 	})
 
 	// 启动HTTP服务器
@@ -148,6 +184,11 @@ func main() {
 		log.Printf("Kafka consumer stop error: %v", err)
 	}
 
+	// 停止信令服务
+	if su, ok := signalingUseCase.(*application.SignalingUseCaseImpl); ok {
+		su.Stop()
+	}
+
 	log.Println("Server exited properly")
 }
 
@@ -168,7 +209,7 @@ func loadConfig() error {
 
 func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
-	
+
 	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
@@ -204,4 +245,19 @@ func initRedis() (*redis.Client, error) {
 	}
 
 	return client, nil
+}
+
+// getHostname 获取当前服务器的主机名或IP
+func getHostname() string {
+	// 优先使用配置的地址
+	if addr := viper.GetString("server.advertise_addr"); addr != "" {
+		return addr
+	}
+
+	// 尝试获取主机名
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "localhost"
+	}
+	return hostname
 }

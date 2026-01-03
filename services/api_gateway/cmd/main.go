@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,21 +37,18 @@ type Config struct {
 }
 
 type Gateway struct {
-	cfg              Config
-	router           *gin.Engine
-	identityClient   imv1.IdentityServiceClient
+	cfg                Config
+	router             *gin.Engine
+	identityClient     imv1.IdentityServiceClient
 	conversationClient imv1.ConversationServiceClient
-	messageClient    imv1.MessageServiceClient
-	presenceClient   imv1.PresenceServiceClient
-	fileClient       imv1.FileServiceClient
-	timeout          time.Duration
+	messageClient      imv1.MessageServiceClient
+	presenceClient     imv1.PresenceServiceClient
+	fileClient         imv1.FileServiceClient
+	timeout            time.Duration
 }
 
 func main() {
-	cfgPath := flag.String("config", "configs/config.dev.yaml", "配置文件路径")
-	flag.Parse()
-
-	cfg, err := loadConfig(*cfgPath)
+	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
@@ -137,9 +133,16 @@ func main() {
 	log.Println("API Gateway shutdown")
 }
 
-func loadConfig(path string) (Config, error) {
-	viper.SetConfigFile(path)
+func loadConfig() (Config, error) {
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+
+	viper.SetConfigName(fmt.Sprintf("config.%s", env))
 	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../configs")
 	viper.SetDefault("server.grpc_timeout", "3s")
 	viper.SetDefault("server.read_timeout", "5s")
 	viper.SetDefault("server.write_timeout", "5s")

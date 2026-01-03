@@ -87,10 +87,10 @@ IM/
 |------|-----------|-----------|------|
 | API Gateway | 8080 | - | 统一入口网关 |
 | Identity Service | 8081 | 9080 | 身份认证、用户管理 |
-| Conversation Service | 8082 | 9081 | 会话管理 |
+| Conversation Service | - | 9081 | 会话管理（仅 gRPC） |
 | Message Service | 8083 | 9082 | 消息收发 |
 | Delivery Service | 8084 | - | 消息投递、WebSocket |
-| Presence Service | - | 9084 | 在线状态 |
+| Presence Service | - | 9084 | 在线状态（仅 gRPC） |
 | File Service | 8085 | 9085 | 文件上传 |
 
 ### 服务说明
@@ -137,6 +137,113 @@ HTTP API 统一入口，负责：
 - 生成 MinIO 预签名上传 URL
 - 文件元数据管理
 
+
+#### 待整理
+##### 1. Redis Lua 脚本原子递增（消息序列号）
+**文件位置**: `services/message_service/internal/adapters/out/redis/sequence_repo.go`
+
+```go
+// 核心实现：使用 Lua 脚本保证原子性
+luaScript := `
+local seq = redis.call('HINCRBY', KEYS[1], 'max_seq', 1)
+if ARGV[1] ~= '' then
+    redis.call('HSET', KEYS[1], 'msg_' .. ARGV[1], seq)
+end
+return seq
+`
+```
+
+##### 2. Timeline 写扩散缓存
+**文件位置**: `services/message_service/internal/adapters/out/redis/timeline_repo.go`
+
+核心功能：
+- ZSet 存储消息索引
+- 支持分页获取
+- 自动过期清理
+- 批量添加消息
+
+##### 3. 读扩散 Inbox 收件箱
+**文件位置**: `services/message_service/internal/adapters/out/redis/inbox_repo.go`
+
+核心功能：
+- 用户收件箱管理
+- Lua 脚本批量获取
+- 会话未读计数
+- 已读位置追踪
+
+##### 4. Kafka 死信队列 & 可靠消费
+**文件位置**: `services/delivery_service/internal/adapters/out/mq/reliable_consumer.go`
+
+核心功能：
+- 3 次重试机制
+- 指数退避策略
+- 自动转移死信队列
+- 手动确认模式
+
+```go
+type ReliableConsumer struct {
+    maxRetries    int           // 默认 3 次
+    retryInterval time.Duration // 默认 1 秒
+    dlqSuffix     string        // 死信队列后缀 "-dlq"
+}
+```
+
+##### 5. ACK 机制（消息确认）
+**文件位置**: 
+- `services/delivery_service/internal/adapters/out/redis/pending_ack_repo.go`
+- `services/delivery_service/internal/application/delivery.go`
+
+核心功能：
+- 待确认消息存储
+- 超时重传机制（10秒）
+- 批量 ACK 支持
+- 已读状态同步
+
+##### 6. Push-Pull 混合同步
+**文件位置**: 
+- `services/delivery_service/internal/adapters/out/redis/sync_state_repo.go`
+- `services/delivery_service/internal/application/delivery.go`
+
+核心功能：
+- 实时 Push（在线用户）
+- 离线 Pull（历史消息）
+- 同步位置记录
+- 增量拉取支持
+
+##### 7. WebSocket 服务器
+**文件位置**: `services/delivery_service/internal/adapters/in/ws/ws_server.go`
+
+核心功能：
+- JWT 认证
+- 心跳检测（30秒）
+- 连接管理
+- 房间广播
+- 消息分发
+
+##### 8. 全局在线路由（多实例）
+**文件位置**: `services/delivery_service/internal/adapters/out/redis/online_user_repo.go`
+
+核心功能：
+- Redis 分布式存储
+- 支持多实例部署
+- 用户所在实例查找
+- 自动过期清理
+
+##### 9. WebRTC 信令服务
+**文件位置**: `services/delivery_service/internal/application/signaling.go`
+
+核心功能：
+- Offer/Answer 交换
+- ICE Candidate 转发
+- 通话状态机
+- 超时处理（30秒）
+
+支持的消息类型：
+- `call_offer` - 发起呼叫
+- `call_answer` - 接听呼叫
+- `call_ice` - ICE Candidate
+- `call_hangup` - 挂断
+
 ---
 
 ## 快速开始
@@ -176,20 +283,40 @@ docker ps
 | MySQL | 3306 | localhost:3306 | root / imdev |
 | Redis | 6379 | localhost:6379 | 无密码 |
 | Kafka | 29092 | localhost:29092 | - |
+| Zookeeper | 2181 | localhost:2181 | - |
 | MinIO API | 9000 | localhost:9000 | admin / admin123 |
 | MinIO 控制台 | 9001 | http://localhost:9001 | admin / admin123 |
 
-#### 启动 API Gateway
+#### 启动微服务
+
+所有服务默认加载 `configs/config.dev.yaml` 配置文件，启动命令统一为：
 
 ```bash
-cd services/api_gateway/cmd
-go run main.go handlers.go -config ../configs/config.dev.yaml
+# 启动各微服务（每个服务在独立终端窗口中运行）
+
+# 1. Identity Service (身份认证)
+cd services/identity_service && go run cmd/main.go
+
+# 2. Conversation Service (会话管理)
+cd services/conversation_service && go run cmd/main.go
+
+# 3. Message Service (消息服务)
+cd services/message_service && go run cmd/main.go
+
+# 4. Delivery Service (消息投递/WebSocket)
+cd services/delivery_service && go run cmd/main.go
+
+# 5. Presence Service (在线状态)
+cd services/presence_service && go run cmd/main.go
+
+# 6. File Service (文件服务)
+cd services/file_service && go run cmd/main.go
+
+# 7. API Gateway (网关 - 最后启动)
+cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 ```
 
-看到以下输出表示启动成功：
-```
-API Gateway listening on :8080
-```
+可以通过设置环境变量 `APP_ENV` 切换环境，如 `APP_ENV=prod` 使用生产配置
 
 #### 访问 API 文档
 
@@ -251,12 +378,15 @@ docker compose -f docker-compose.prod.yml up -d
 | GET | /api/contacts | 获取联系人列表 |
 | POST | /api/contacts/apply | 发送好友申请 |
 | POST | /api/contacts/handle | 处理好友申请 |
+| DELETE | /api/contacts/:id | 删除联系人 |
 
 #### 会话
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /api/conversations | 获取会话列表 |
+| GET | /api/conversations/:id | 获取会话详情 |
+| PUT | /api/conversations/:id | 更新会话 |
 | POST | /api/conversations | 创建会话 |
 
 #### 消息
@@ -266,6 +396,7 @@ docker compose -f docker-compose.prod.yml up -d
 | POST | /api/messages | 发送消息 |
 | GET | /api/messages/history | 获取历史消息 |
 | POST | /api/messages/read | 标记已读 |
+| POST | /api/messages/:id/revoke | 撤回消息 |
 
 #### 在线状态
 
@@ -280,43 +411,11 @@ docker compose -f docker-compose.prod.yml up -d
 | POST | /api/files/upload | 获取上传 URL |
 | POST | /api/files/complete | 完成上传 |
 
----
+#### WebSocket
 
-## 完整服务启动（可选）
-
-如果需要完整的后端功能（不仅仅是 API Gateway），需要启动所有微服务
-
-在**不同的终端**中分别执行：
-
-```bash
-# 终端 1 - Identity Service
-cd services/identity_service
-go run cmd/main.go -config configs/config.dev.yaml
-
-# 终端 2 - Conversation Service
-cd services/conversation_service
-go run cmd/main.go -config configs/config.dev.yaml
-
-# 终端 3 - Message Service
-cd services/message_service
-go run cmd/chat-server/main.go -config configs/config.dev.yaml
-
-# 终端 4 - Delivery Service
-cd services/delivery_service
-go run cmd/user-server/main.go -config configs/config.dev.yaml
-
-# 终端 5 - Presence Service
-cd services/presence_service
-go run cmd/main.go -config configs/config.dev.yaml
-
-# 终端 6 - File Service
-cd services/file_service
-go run cmd/main.go -config configs/config.dev.yaml
-
-# 终端 7 - API Gateway（必须最后启动）
-cd services/api_gateway/cmd
-go run main.go handlers.go -config ../configs/config.dev.yaml
-```
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /ws | WebSocket 连接端点 |
 
 ---
 
@@ -412,7 +511,7 @@ docker compose -f docker-compose.dev.yml up -d
 ---
 
 ## 其他需求
-二、技术需求
+#### 技术需求
 
 （一）注册中心集成
 1. 服务注册与发现

@@ -3,6 +3,7 @@ module github.com/EthanQC/IM/services/identity_service
 go 1.24.2
 
 require (
+	github.com/EthanQC/IM/api v0.0.0-20260103055027-90b414078d02
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.5

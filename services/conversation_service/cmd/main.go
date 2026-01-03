@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -30,13 +30,16 @@ type Config struct {
 }
 
 func main() {
-	cfgPath := flag.String("config", "configs/config.yaml", "配置文件路径")
-	flag.Parse()
-
 	// 加载配置
-	viper.SetConfigFile(*cfgPath)
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	viper.SetConfigName(fmt.Sprintf("config.%s", env))
 	viper.SetConfigType("yaml")
-	viper.SetDefault("server.grpc_port", 9091)
+	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../configs")
+	viper.SetDefault("server.grpc_port", 9081)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("读取配置文件失败: %v", err)
 	}

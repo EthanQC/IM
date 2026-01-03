@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,6 +28,7 @@ import (
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/out/db"
 	grpcOut "github.com/EthanQC/IM/services/message_service/internal/adapters/out/grpc"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/out/mq"
+	redisRepo "github.com/EthanQC/IM/services/message_service/internal/adapters/out/redis"
 	"github.com/EthanQC/IM/services/message_service/internal/application"
 	"github.com/EthanQC/IM/services/message_service/internal/ports/out"
 )
@@ -43,6 +45,12 @@ func main() {
 		log.Fatalf("Failed to init database: %v", err)
 	}
 
+	// 初始化Redis
+	redisClient, err := initRedis()
+	if err != nil {
+		log.Fatalf("Failed to init redis: %v", err)
+	}
+
 	// 初始化Kafka发布器
 	kafkaBrokers := viper.GetStringSlice("kafka.brokers")
 	eventPublisher, err := mq.NewKafkaEventPublisher(kafkaBrokers)
@@ -52,8 +60,15 @@ func main() {
 
 	// 初始化仓储层
 	messageRepo := db.NewMessageRepositoryMySQL(database)
-	sequenceRepo := db.NewSequenceRepositoryMySQL(database)
-	inboxRepo := db.NewInboxRepositoryMySQL(database)
+
+	// 使用Redis Lua脚本实现的原子序号生成器
+	sequenceRepo := redisRepo.NewSequenceRepositoryRedis(redisClient)
+
+	// 使用Redis实现的收件箱仓储（热数据缓存）
+	inboxRepo := redisRepo.NewInboxRepositoryRedis(redisClient)
+
+	// Timeline 仓储（热消息缓存）
+	timelineRepo := redisRepo.NewTimelineRepositoryRedis(redisClient)
 
 	// 初始化会话成员仓储（gRPC）
 	var memberRepo out.ConversationMemberRepository
@@ -72,11 +87,12 @@ func main() {
 	defer convConn.Close()
 	memberRepo = grpcOut.NewConversationClient(imv1.NewConversationServiceClient(convConn), convTimeout)
 
-	// 初始化应用层
-	messageUseCase := application.NewMessageUseCaseImpl(
+	// 初始化应用层（增强版）
+	messageUseCase := application.NewEnhancedMessageUseCase(
 		messageRepo,
 		sequenceRepo,
 		inboxRepo,
+		timelineRepo,
 		memberRepo,
 		eventPublisher,
 	)
@@ -183,7 +199,7 @@ func loadConfig() error {
 
 func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
-	
+
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
@@ -201,4 +217,22 @@ func initDB() (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return db, nil
+}
+
+func initRedis() (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     viper.GetString("redis.addr"),
+		Password: viper.GetString("redis.password"),
+		DB:       viper.GetInt("redis.db"),
+		PoolSize: viper.GetInt("redis.pool_size"),
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect redis: %w", err)
+	}
+
+	return client, nil
 }

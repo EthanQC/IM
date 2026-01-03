@@ -153,3 +153,15 @@ func NewMediaMessage(conversationID, senderID uint64, clientMsgID string, conten
 		UpdatedAt:      now,
 	}
 }
+
+// Inbox 收件箱实体
+type Inbox struct {
+	UserID           uint64    `json:"user_id"`
+	ConversationID   uint64    `json:"conversation_id"`
+	LastReadSeq      uint64    `json:"last_read_seq"`
+	LastDeliveredSeq uint64    `json:"last_delivered_seq"`
+	UnreadCount      int       `json:"unread_count"`
+	IsMuted          bool      `json:"is_muted"`
+	IsPinned         bool      `json:"is_pinned"`
+	LastMsgTime      time.Time `json:"last_msg_time"`
+}

@@ -1,7 +1,7 @@
 # Message Service 开发环境配置
 
 server:
-  http_port: 8082
+  http_port: 8083
   grpc_port: 9082
   mode: debug
 

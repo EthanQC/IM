@@ -15,17 +15,17 @@ import (
 
 // MessageModel GORM模型
 type MessageModel struct {
-	ID             uint64         `gorm:"column:id;primaryKey;autoIncrement"`
-	ConversationID uint64         `gorm:"column:conversation_id;not null;index"`
-	SenderID       uint64         `gorm:"column:sender_id;not null;index"`
-	ClientMsgID    string         `gorm:"column:client_msg_id;type:varchar(64);not null"`
-	Seq            uint64         `gorm:"column:seq;not null"`
-	ContentType    int8           `gorm:"column:content_type;not null"`
-	Content        string         `gorm:"column:content;type:json;not null"`
-	Status         int8           `gorm:"column:status;default:1"`
-	ReplyToMsgID   sql.NullInt64  `gorm:"column:reply_to_msg_id"`
-	CreatedAt      time.Time      `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	ID             uint64        `gorm:"column:id;primaryKey;autoIncrement"`
+	ConversationID uint64        `gorm:"column:conversation_id;not null;index"`
+	SenderID       uint64        `gorm:"column:sender_id;not null;index"`
+	ClientMsgID    string        `gorm:"column:client_msg_id;type:varchar(64);not null"`
+	Seq            uint64        `gorm:"column:seq;not null"`
+	ContentType    int8          `gorm:"column:content_type;not null"`
+	Content        string        `gorm:"column:content;type:json;not null"`
+	Status         int8          `gorm:"column:status;default:1"`
+	ReplyToMsgID   sql.NullInt64 `gorm:"column:reply_to_msg_id"`
+	CreatedAt      time.Time     `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt      time.Time     `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 func (MessageModel) TableName() string {
@@ -348,4 +348,42 @@ func (r *InboxRepositoryMySQL) GetUnreadCount(ctx context.Context, userID, conve
 		Select("unread_count").
 		Scan(&count).Error
 	return count, err
+}
+
+// GetTotalUnread 获取用户总未读数
+func (r *InboxRepositoryMySQL) GetTotalUnread(ctx context.Context, userID uint64) (int, error) {
+	var total int
+	err := r.db.WithContext(ctx).
+		Model(&InboxModel{}).
+		Where("user_id = ? AND is_muted = 0", userID).
+		Select("COALESCE(SUM(unread_count), 0)").
+		Scan(&total).Error
+	return total, err
+}
+
+// GetUserInboxes 获取用户的所有收件箱
+func (r *InboxRepositoryMySQL) GetUserInboxes(ctx context.Context, userID uint64) ([]*entity.Inbox, error) {
+	var models []InboxModel
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("updated_at DESC").
+		Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	inboxes := make([]*entity.Inbox, len(models))
+	for i, m := range models {
+		inboxes[i] = &entity.Inbox{
+			UserID:           m.UserID,
+			ConversationID:   m.ConversationID,
+			LastReadSeq:      m.LastReadSeq,
+			LastDeliveredSeq: m.LastDeliveredSeq,
+			UnreadCount:      int(m.UnreadCount),
+			IsMuted:          m.IsMuted == 1,
+			IsPinned:         m.IsPinned == 1,
+		}
+	}
+
+	return inboxes, nil
 }

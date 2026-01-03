@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -32,8 +32,8 @@ import (
 // Config 定义从 YAML 加载的所有配置项
 type Config struct {
 	Server struct {
-		HTTPPort int `mapstructure:"http_port"`
-		GrpcPort int `mapstructure:"grpc_port"`
+		HTTPPort int    `mapstructure:"http_port"`
+		GrpcPort int    `mapstructure:"grpc_port"`
 		Mode     string `mapstructure:"mode"`
 	} `mapstructure:"server"`
 	JWT struct {
@@ -67,15 +67,16 @@ type Config struct {
 }
 
 func main() {
-	// 仅定义一个配置文件路径参数
-	cfgPath := flag.String("config", "configs/config.dev.yaml", "配置文件路径（YAML）")
-	flag.Parse()
-
 	// 加载配置
-	viper.SetConfigFile(*cfgPath)
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	viper.SetConfigName(fmt.Sprintf("config.%s", env))
 	viper.SetConfigType("yaml")
-	// 默认值：如果配置中未包含 grpc_port，则使用 9090
-	viper.SetDefault("server.grpc_port", 9090)
+	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../configs")
+	viper.SetDefault("server.grpc_port", 9080)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("读取配置文件失败: %v", err)
 	}
