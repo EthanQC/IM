@@ -511,6 +511,10 @@ docker compose -f docker-compose.dev.yml up -d
 ---
 
 ## 其他需求
+1. 事务性 Outbox 强一致性保证
+2. 压测，并发量和存储空间
+3. 部署
+
 #### 技术需求
 
 （一）注册中心集成
