@@ -1,8 +1,0 @@
-server:
-  http_port: 18082
-  grpc_port: 19082
-  mode: debug
-
-grpc:
-  conversation_addr: "127.0.0.1:19081"
-  timeout: 3s

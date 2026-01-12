@@ -1,0 +1,45 @@
+# Message Service 生产环境配置示例
+# 复制此文件为 config.prod.yaml 并填入真实配置
+# 敏感信息建议通过环境变量注入
+
+server:
+  http_port: 8083
+  grpc_port: 9082
+  mode: release
+
+grpc:
+  conversation_addr: "conversation-service:9081"
+  timeout: 3s
+
+mysql:
+  dsn: "${MYSQL_DSN}"
+  max_idle_conns: 50
+  max_open_conns: 200
+
+redis:
+  addr: "${REDIS_ADDR}"
+  password: "${REDIS_PASSWORD}"
+  db: 0
+  pool_size: 200
+
+kafka:
+  brokers:
+    - "${KAFKA_BROKER_1}"
+    - "${KAFKA_BROKER_2}"
+    - "${KAFKA_BROKER_3}"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+
+log:
+  service: "message-service"
+  level: info
+  encoding: json
+  stdout: true
+  file:
+    path: /var/log/im/message_service.log
+    max_size: 100
+    max_backups: 60
+    max_age: 30
+    compress: true

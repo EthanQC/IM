@@ -1,0 +1,37 @@
+# File Service 生产环境配置示例
+# 复制此文件为 config.prod.yaml 并填入真实配置
+# 敏感信息建议通过环境变量注入
+
+server:
+  http_port: 8085
+  grpc_port: 9085
+  callback_url: "http://file-service:8085/callback/upload"
+  mode: release
+
+grpc:
+  message_addr: "message-service:9082"
+
+mysql:
+  dsn: "root:${DB_PASSWORD}@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 50
+  max_open_conns: 200
+
+minio:
+  endpoint: "minio:9000"
+  access_key: "${MINIO_ACCESS_KEY}"
+  secret_key: "${MINIO_SECRET_KEY}"
+  use_ssl: false
+  bucket: "im-files"
+  region: "us-east-1"
+
+log:
+  service: "file-service"
+  level: info
+  encoding: json
+  stdout: true
+  file:
+    path: /var/log/im/file_service.log
+    max_size: 100
+    max_backups: 60
+    max_age: 30
+    compress: true

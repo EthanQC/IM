@@ -1,0 +1,36 @@
+# Message Service 本地开发环境配置示例
+# 复制此文件为 config.dev.yaml 并根据需要修改
+
+server:
+  http_port: 8083
+  grpc_port: 9082
+  mode: debug
+
+grpc:
+  conversation_addr: "127.0.0.1:9081"
+  timeout: 3s
+
+mysql:
+  dsn: "root:your_password@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  pool_size: 100
+
+kafka:
+  brokers:
+    - "127.0.0.1:29092"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+
+log:
+  service: "message-service"
+  level: debug
+  encoding: console
+  stdout: true

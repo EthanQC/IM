@@ -1,0 +1,55 @@
+# Delivery Service 生产环境配置示例
+# 复制此文件为 config.prod.yaml 并填入真实配置
+# 敏感信息建议通过环境变量注入
+
+server:
+  http_port: 8084
+  mode: release
+  advertise_addr: "${ADVERTISE_ADDR}"
+
+mysql:
+  dsn: "root:${DB_PASSWORD}@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 50
+  max_open_conns: 200
+
+redis:
+  addr: "redis:6379"
+  password: "${REDIS_PASSWORD}"
+  db: 0
+  pool_size: 200
+
+kafka:
+  brokers:
+    - "kafka:9092"
+  group_id: "delivery-service-group"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+    dead_letter: "im.delivery.dead_letter"
+
+webrtc:
+  stun_servers:
+    - "stun:stun.l.google.com:19302"
+  turn_servers:
+    - url: "${TURN_SERVER_URL}"
+      username: "${TURN_USERNAME}"
+      credential: "${TURN_CREDENTIAL}"
+
+websocket:
+  heartbeat_interval: 30s
+  write_timeout: 10s
+  read_timeout: 60s
+  max_message_size: 65536
+
+log:
+  service: "delivery-service"
+  level: info
+  encoding: json
+  stdout: true
+  file:
+    path: /var/log/im/delivery_service.log
+    max_size: 100
+    max_backups: 60
+    max_age: 30
+    compress: true

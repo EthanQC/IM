@@ -165,3 +165,11 @@ type Inbox struct {
 	IsPinned         bool      `json:"is_pinned"`
 	LastMsgTime      time.Time `json:"last_msg_time"`
 }
+
+// ConversationType 会话类型
+type ConversationType int8
+
+const (
+	ConversationTypePrivate ConversationType = 1 // 单聊
+	ConversationTypeGroup   ConversationType = 2 // 群聊
+)

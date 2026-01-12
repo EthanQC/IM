@@ -1,0 +1,30 @@
+# Conversation Service 生产环境配置示例
+# 复制此文件为 config.prod.yaml 并填入真实配置
+# 敏感信息建议通过环境变量注入
+
+server:
+  http_port: 8082
+  grpc_port: 9081
+  mode: release
+
+mysql:
+  dsn: "root:${DB_PASSWORD}@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 50
+  max_open_conns: 200
+
+redis:
+  addr: "redis:6379"
+  password: "${REDIS_PASSWORD}"
+  db: 0
+
+log:
+  service: "conversation-service"
+  level: info
+  encoding: json
+  stdout: true
+  file:
+    path: /var/log/im/conversation_service.log
+    max_size: 100
+    max_backups: 60
+    max_age: 30
+    compress: true

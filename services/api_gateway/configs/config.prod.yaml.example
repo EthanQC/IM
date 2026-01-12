@@ -1,0 +1,24 @@
+# API Gateway 生产环境配置示例
+# 复制此文件为 config.prod.yaml 并填入真实配置
+# 敏感信息建议通过环境变量注入
+
+server:
+  http_port: 8080
+  grpc_addr_identity: "identity-service:9080"
+  grpc_addr_conversation: "conversation-service:9081"
+  grpc_addr_message: "message-service:9082"
+  http_addr_message: "http://message-service:8082"
+  grpc_addr_presence: "presence-service:9084"
+  grpc_addr_file: "file-service:9085"
+  grpc_timeout: 5s
+  read_timeout: 15s
+  write_timeout: 15s
+
+jwt:
+  secret: "${JWT_SECRET}"
+
+log:
+  service: "api-gateway"
+  level: info
+  encoding: json
+  stdout: true

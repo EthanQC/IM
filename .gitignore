@@ -61,9 +61,11 @@ vendor/
 logs/
 *.log
 
-# 配置文件
+# 配置文件（保留 example 文件）
 *.env
-*.yaml
+**/configs/config.dev.yaml
+**/configs/config.prod.yaml
+!**/configs/*.example
 
 # 证书和密钥文件
 *.pem

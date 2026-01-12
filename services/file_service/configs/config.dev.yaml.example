@@ -1,0 +1,30 @@
+# File Service 本地开发环境配置示例
+# 复制此文件为 config.dev.yaml 并根据需要修改
+
+server:
+  http_port: 8085
+  grpc_port: 9085
+  callback_url: "http://localhost:8085/callback/upload"
+  mode: debug
+
+grpc:
+  message_addr: "127.0.0.1:9082"
+
+mysql:
+  dsn: "root:your_password@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+minio:
+  endpoint: "127.0.0.1:9000"
+  access_key: "your_access_key"
+  secret_key: "your_secret_key"
+  use_ssl: false
+  bucket: "im-files"
+  region: "us-east-1"
+
+log:
+  service: "file-service"
+  level: debug
+  encoding: console
+  stdout: true

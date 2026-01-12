@@ -1,0 +1,49 @@
+# Delivery Service 本地开发环境配置示例
+# 复制此文件为 config.dev.yaml 并根据需要修改
+
+server:
+  http_port: 8084
+  mode: debug
+  advertise_addr: "127.0.0.1"
+
+mysql:
+  dsn: "root:your_password@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  pool_size: 100
+
+kafka:
+  brokers:
+    - "127.0.0.1:29092"
+  group_id: "delivery-service-group"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+    dead_letter: "im.delivery.dead_letter"
+
+webrtc:
+  stun_servers:
+    - "stun:stun.l.google.com:19302"
+    - "stun:stun1.l.google.com:19302"
+  # turn_servers:
+  #   - url: "turn:your-turn-server.com:3478"
+  #     username: "username"
+  #     credential: "password"
+
+websocket:
+  heartbeat_interval: 30s
+  write_timeout: 10s
+  read_timeout: 60s
+  max_message_size: 65536
+
+log:
+  service: "delivery-service"
+  level: debug
+  encoding: console
+  stdout: true

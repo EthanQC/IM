@@ -1,0 +1,23 @@
+# API Gateway 本地开发环境配置示例
+# 复制此文件为 config.dev.yaml 并根据需要修改
+
+server:
+  http_port: 8080
+  grpc_addr_identity: "127.0.0.1:9080"
+  grpc_addr_conversation: "127.0.0.1:9081"
+  grpc_addr_message: "127.0.0.1:9082"
+  http_addr_message: "http://127.0.0.1:8083"
+  grpc_addr_presence: "127.0.0.1:9084"
+  grpc_addr_file: "127.0.0.1:9085"
+  grpc_timeout: 3s
+  read_timeout: 10s
+  write_timeout: 10s
+
+jwt:
+  secret: "your-dev-jwt-secret-key-at-least-32-characters"
+
+log:
+  service: "api-gateway"
+  level: debug
+  encoding: console
+  stdout: true

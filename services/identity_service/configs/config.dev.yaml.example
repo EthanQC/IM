@@ -1,0 +1,35 @@
+# Identity Service 本地开发环境配置示例
+# 复制此文件为 config.dev.yaml 并根据需要修改
+
+server:
+  http_port: 8081
+  grpc_port: 9080
+  mode: debug
+
+mysql:
+  dsn: "root:your_password@tcp(127.0.0.1:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+kafka:
+  brokers:
+    - "127.0.0.1:29092"
+  topic: "user-events"
+
+jwt:
+  secret: "your-dev-jwt-secret-key-at-least-32-characters"
+  access_ttl: 15m
+  refresh_ttl: 168h
+
+verification:
+  code_ttl: 5m
+  max_attempts: 3
+
+log:
+  service: "identity-service"
+  level: debug
+  encoding: console
+  stdout: true
