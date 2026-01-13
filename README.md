@@ -328,30 +328,139 @@ cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 - 需要认证的接口，先登录获取 token，然后点击 "Authorize" 按钮输入
 
 ### 部署上云
-#### 使用 Docker Compose
+
+#### 服务器要求
+
+| 配置 | 最低要求 | 推荐配置 |
+|------|----------|----------|
+| CPU | 2核 | 4核 |
+| 内存 | 2GB | 4GB |
+| 硬盘 | 40GB SSD | 100GB SSD |
+| 系统 | Ubuntu 22.04 | Ubuntu 22.04 |
+| 带宽 | 1Mbps | 5Mbps |
+
+#### 一、服务器初始化
 
 ```bash
-cd deploy
+# 1. SSH 登录服务器
+ssh root@your_server_ip
 
-# 复制环境变量文件
-cp .env.example .env
+# 2. 下载并运行初始化脚本
+curl -fsSL https://raw.githubusercontent.com/EthanQC/IM/main/deploy/scripts/server-init.sh | bash
 
-# 编辑 .env 文件，设置安全的密码
-vim .env
-
-# 启动所有服务
-docker compose -f docker-compose.prod.yml up -d
+# 脚本会自动完成：
+# - 安装 Docker 和 Docker Compose
+# - 配置 2GB Swap（小内存必需）
+# - 优化系统参数
+# - 创建部署目录 /root/im-deploy
 ```
 
-#### 环境变量
+#### 二、配置 GitHub Secrets
 
-| 变量 | 说明 |
-|------|------|
-| MYSQL_ROOT_PASSWORD | MySQL root 密码 |
-| REDIS_PASSWORD | Redis 密码 |
-| JWT_SECRET | JWT 签名密钥 |
-| MINIO_ROOT_USER | MinIO 管理员用户名 |
-| MINIO_ROOT_PASSWORD | MinIO 管理员密码 |
+在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中添加以下 Secrets：
+
+| Secret 名称 | 说明 | 示例 |
+|-------------|------|------|
+| `SERVER_HOST` | 服务器公网 IP | `123.45.67.89` |
+| `SERVER_USER` | SSH 用户名 | `root` |
+| `SERVER_SSH_KEY` | SSH 私钥 | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+
+#### 三、上传部署文件
+
+```bash
+# 在本地项目目录执行
+cd deploy
+
+# 上传配置文件到服务器
+scp docker-compose.cloud.yml root@your_server_ip:/root/im-deploy/
+scp .env.example root@your_server_ip:/root/im-deploy/.env
+scp -r sql root@your_server_ip:/root/im-deploy/
+
+# 登录服务器编辑 .env
+ssh root@your_server_ip
+cd /root/im-deploy
+vim .env  # 修改密码等配置
+
+# 设置 GitHub 仓库名（替换为你的仓库）
+sed -i 's|GITHUB_REPO=.*|GITHUB_REPO=你的用户名/IM|' .env
+```
+
+#### 四、触发 CI/CD 部署
+
+```bash
+# 推送代码到 main 分支，自动触发部署
+git push origin main
+
+# 或者手动触发（GitHub Actions 页面）
+# Actions -> CD -> Run workflow
+```
+
+#### 五、手动部署（可选）
+
+如果不想使用 CI/CD，可以手动部署：
+
+```bash
+# 登录服务器
+ssh root@your_server_ip
+cd /root/im-deploy
+
+# 构建并启动（首次部署）
+docker compose -f docker-compose.cloud.yml up -d --build
+
+# 查看日志
+docker compose -f docker-compose.cloud.yml logs -f
+
+# 查看服务状态
+docker compose -f docker-compose.cloud.yml ps
+```
+
+#### 六、验证部署
+
+```bash
+# 检查 API Gateway
+curl http://your_server_ip/healthz
+# 返回: {"status":"ok"}
+
+# 访问 API 文档
+# 浏览器打开: http://your_server_ip/swagger
+```
+
+#### 七、常用运维命令
+
+```bash
+# 查看所有服务状态
+docker compose -f docker-compose.cloud.yml ps
+
+# 查看服务日志
+docker compose -f docker-compose.cloud.yml logs -f api-gateway
+docker compose -f docker-compose.cloud.yml logs -f message-service
+
+# 重启单个服务
+docker compose -f docker-compose.cloud.yml restart api-gateway
+
+# 更新镜像并重启
+docker compose -f docker-compose.cloud.yml pull
+docker compose -f docker-compose.cloud.yml up -d
+
+# 停止所有服务
+docker compose -f docker-compose.cloud.yml down
+
+# 停止并删除数据（危险！）
+docker compose -f docker-compose.cloud.yml down -v
+```
+
+#### 内存分配（2G服务器）
+
+| 组件 | 内存限制 | 说明 |
+|------|----------|------|
+| MySQL | 512MB | 数据库 |
+| Kafka | 350MB | 消息队列 |
+| Redis | 150MB | 缓存 |
+| MinIO | 128MB | 文件存储 |
+| 7个微服务 | ~420MB | 每个约60MB |
+| 系统+Swap | ~500MB | 系统预留 |
+| **总计** | ~2GB | |
+
 
 ---
 
