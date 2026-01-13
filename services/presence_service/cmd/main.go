@@ -3,17 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
+	"github.com/EthanQC/IM/pkg/zlog"
 	grpcServer "github.com/EthanQC/IM/services/presence_service/internal/adapters/in/grpc"
 	redisRepo "github.com/EthanQC/IM/services/presence_service/internal/adapters/out/redis"
 	"github.com/EthanQC/IM/services/presence_service/internal/application"
@@ -22,15 +24,40 @@ import (
 func main() {
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "presence-service"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("presence_service starting", zap.String("env", env))
 
 	// 初始化Redis
 	redisClient, err := initRedis()
 	if err != nil {
-		log.Fatalf("Failed to init redis: %v", err)
+		logger.Fatal("Failed to init redis", zap.Error(err))
 	}
 	defer redisClient.Close()
+	logger.Info("Redis 连接成功")
 
 	// 初始化仓储
 	presenceRepo := redisRepo.NewPresenceRepositoryRedis(redisClient)
@@ -42,7 +69,7 @@ func main() {
 	grpcPort := viper.GetInt("server.grpc_port")
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		logger.Fatal("Failed to listen", zap.Error(err))
 	}
 
 	server := grpc.NewServer()
@@ -50,9 +77,9 @@ func main() {
 	grpcServer.RegisterPresenceServiceServer(server, presenceServer)
 
 	go func() {
-		log.Printf("Presence service starting on port %d", grpcPort)
+		logger.Info("Presence service starting", zap.Int("port", grpcPort))
 		if err := server.Serve(listener); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
+			logger.Fatal("gRPC server failed", zap.Error(err))
 		}
 	}()
 
@@ -60,10 +87,10 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	server.GracefulStop()
-	log.Println("Server exited properly")
+	logger.Info("Server exited properly")
 }
 
 func loadConfig() error {

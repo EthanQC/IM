@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/EthanQC/IM/api v0.0.0-20251231144732-9dc5c2a0d356
 	github.com/spf13/viper v1.20.1
+	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 	gorm.io/driver/mysql v1.5.7

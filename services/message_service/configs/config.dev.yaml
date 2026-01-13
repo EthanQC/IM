@@ -29,6 +29,9 @@ kafka:
     message_revoked: "im.message.revoked"
 
 log:
+  service: "message-service"
   level: debug
-  format: json
-  output: stdout
+  encoding: console
+  stdout: true
+  file:
+    path: ""

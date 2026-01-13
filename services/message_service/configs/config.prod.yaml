@@ -31,7 +31,13 @@ kafka:
     message_revoked: "im.message.revoked"
 
 log:
+  service: "message-service"
   level: info
-  format: json
-  output: file
-  file_path: /var/log/im/message_service.log
+  encoding: json
+  stdout: true
+  file:
+    path: "/var/log/im/message-service.log"
+    max_size: 100
+    max_backups: 60
+    max_age: 30
+    compress: true

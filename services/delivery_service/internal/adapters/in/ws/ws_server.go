@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 
 	"github.com/EthanQC/IM/services/delivery_service/internal/ports/in"
 	"github.com/EthanQC/IM/services/delivery_service/internal/ports/out"
@@ -189,7 +189,7 @@ func (c *EnhancedWSConnection) ReadPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-				log.Printf("WebSocket error for user %d: %v", c.userID, err)
+				zap.L().Warn("WebSocket error", zap.Uint64("userID", c.userID), zap.Error(err))
 			}
 			break
 		}
@@ -216,7 +216,7 @@ func (c *EnhancedWSConnection) WritePump() {
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				log.Printf("Write error for user %d: %v", c.userID, err)
+				zap.L().Warn("Write error", zap.Uint64("userID", c.userID), zap.Error(err))
 				return
 			}
 
@@ -241,7 +241,9 @@ func (c *EnhancedWSConnection) cleanup() {
 		c.connUseCase.UserDisconnect(context.Background(), c.userID, c.deviceID)
 	}
 	
-	log.Printf("Connection cleanup for user %d, device %s", c.userID, c.deviceID)
+	zap.L().Info("Connection cleanup",
+		zap.Uint64("userID", c.userID),
+		zap.String("deviceID", c.deviceID))
 }
 
 func (c *EnhancedWSConnection) handleMessage(data []byte) {
@@ -479,8 +481,10 @@ func (m *EnhancedConnectionManager) Register(userID uint64, deviceID string, con
 	m.connections[userID][deviceID] = enhancedConn
 	atomic.AddInt64(&m.totalConns, 1)
 	
-	log.Printf("Connection registered: userID=%d, deviceID=%s, totalConns=%d", 
-		userID, deviceID, atomic.LoadInt64(&m.totalConns))
+	zap.L().Info("Connection registered",
+		zap.Uint64("userID", userID),
+		zap.String("deviceID", deviceID),
+		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
 	
 	return nil
 }
@@ -501,8 +505,10 @@ func (m *EnhancedConnectionManager) Unregister(userID uint64, deviceID string) e
 		}
 	}
 
-	log.Printf("Connection unregistered: userID=%d, deviceID=%s, totalConns=%d",
-		userID, deviceID, atomic.LoadInt64(&m.totalConns))
+	zap.L().Info("Connection unregistered",
+		zap.Uint64("userID", userID),
+		zap.String("deviceID", deviceID),
+		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
 	
 	return nil
 }
@@ -534,7 +540,9 @@ func (m *EnhancedConnectionManager) Send(userID uint64, message []byte) error {
 
 	for _, conn := range devices {
 		if err := conn.Send(message); err != nil {
-			log.Printf("Failed to send message to user %d: %v", userID, err)
+			zap.L().Warn("Failed to send message to user",
+				zap.Uint64("userID", userID),
+				zap.Error(err))
 		}
 	}
 	
@@ -619,7 +627,7 @@ func NewEnhancedWSServer(
 func (s *EnhancedWSServer) HandleConnection(w http.ResponseWriter, r *http.Request, userID uint64, deviceID, platform string) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		zap.L().Warn("WebSocket upgrade error", zap.Error(err))
 		return
 	}
 

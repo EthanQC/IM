@@ -3,19 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
+	"github.com/EthanQC/IM/pkg/zlog"
 )
 
 type Config struct {
@@ -50,8 +52,32 @@ type Gateway struct {
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "api-gateway"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("api_gateway starting", zap.String("env", env))
 
 	gw := &Gateway{
 		cfg:     cfg,
@@ -63,7 +89,7 @@ func main() {
 	if cfg.Server.GrpcAddrIdentity != "" {
 		conn, err := grpc.Dial(cfg.Server.GrpcAddrIdentity, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Warning: failed to connect identity service: %v", err)
+			logger.Warn("failed to connect identity service", zap.Error(err))
 		} else {
 			gw.identityClient = imv1.NewIdentityServiceClient(conn)
 		}
@@ -72,7 +98,7 @@ func main() {
 	if cfg.Server.GrpcAddrConversation != "" {
 		conn, err := grpc.Dial(cfg.Server.GrpcAddrConversation, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Warning: failed to connect conversation service: %v", err)
+			logger.Warn("failed to connect conversation service", zap.Error(err))
 		} else {
 			gw.conversationClient = imv1.NewConversationServiceClient(conn)
 		}
@@ -81,7 +107,7 @@ func main() {
 	if cfg.Server.GrpcAddrMessage != "" {
 		conn, err := grpc.Dial(cfg.Server.GrpcAddrMessage, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Warning: failed to connect message service: %v", err)
+			logger.Warn("failed to connect message service", zap.Error(err))
 		} else {
 			gw.messageClient = imv1.NewMessageServiceClient(conn)
 		}
@@ -90,7 +116,7 @@ func main() {
 	if cfg.Server.GrpcAddrPresence != "" {
 		conn, err := grpc.Dial(cfg.Server.GrpcAddrPresence, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Warning: failed to connect presence service: %v", err)
+			logger.Warn("failed to connect presence service", zap.Error(err))
 		} else {
 			gw.presenceClient = imv1.NewPresenceServiceClient(conn)
 		}
@@ -99,7 +125,7 @@ func main() {
 	if cfg.Server.GrpcAddrFile != "" {
 		conn, err := grpc.Dial(cfg.Server.GrpcAddrFile, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
-			log.Printf("Warning: failed to connect file service: %v", err)
+			logger.Warn("failed to connect file service", zap.Error(err))
 		} else {
 			gw.fileClient = imv1.NewFileServiceClient(conn)
 		}
@@ -116,9 +142,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("API Gateway listening on %s", addr)
+		logger.Info("API Gateway listening", zap.String("addr", addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("gateway failed: %v", err)
+			logger.Fatal("gateway failed", zap.Error(err))
 		}
 	}()
 
@@ -130,7 +156,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(ctx)
-	log.Println("API Gateway shutdown")
+	logger.Info("API Gateway shutdown")
 }
 
 func loadConfig() (Config, error) {

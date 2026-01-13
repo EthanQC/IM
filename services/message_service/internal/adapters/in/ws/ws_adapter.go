@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 
 	"github.com/EthanQC/IM/services/message_service/internal/domain/entity"
 	"github.com/EthanQC/IM/services/message_service/internal/ports/in"
@@ -92,7 +92,9 @@ func (h *Hub) Run() {
 			}
 			h.clients[client.userID][client.deviceID] = client
 			h.mu.Unlock()
-			log.Printf("Client registered: userID=%d, deviceID=%s", client.userID, client.deviceID)
+			zap.L().Info("Client registered",
+				zap.Uint64("userID", client.userID),
+				zap.String("deviceID", client.deviceID))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -105,7 +107,9 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
-			log.Printf("Client unregistered: userID=%d, deviceID=%s", client.userID, client.deviceID)
+			zap.L().Info("Client unregistered",
+				zap.Uint64("userID", client.userID),
+				zap.String("deviceID", client.deviceID))
 
 		case message := <-h.broadcast:
 			h.mu.RLock()
@@ -173,7 +177,7 @@ var upgrader = websocket.Upgrader{
 func (h *Hub) ServeWs(w http.ResponseWriter, r *http.Request, userID uint64, deviceID string) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade failed: %v", err)
+		zap.L().Warn("WebSocket upgrade failed", zap.Error(err))
 		return
 	}
 
@@ -221,7 +225,7 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				zap.L().Warn("WebSocket error", zap.Error(err))
 			}
 			break
 		}

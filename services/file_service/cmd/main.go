@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/driver/mysql"
@@ -20,6 +21,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
+	"github.com/EthanQC/IM/pkg/zlog"
 	grpcServer "github.com/EthanQC/IM/services/file_service/internal/adapters/in/grpc"
 	minioAdapter "github.com/EthanQC/IM/services/file_service/internal/adapters/out/minio"
 	mysqlRepo "github.com/EthanQC/IM/services/file_service/internal/adapters/out/mysql"
@@ -29,13 +31,37 @@ import (
 func main() {
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "file-service"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("file_service starting", zap.String("env", env))
 
 	// 初始化数据库
 	database, err := initDB()
 	if err != nil {
-		log.Fatalf("Failed to init database: %v", err)
+		logger.Fatal("Failed to init database", zap.Error(err))
 	}
 
 	// 初始化MinIO
@@ -46,15 +72,15 @@ func main() {
 		viper.GetBool("minio.use_ssl"),
 	)
 	if err != nil {
-		log.Fatalf("Failed to init minio: %v", err)
+		logger.Fatal("Failed to init minio", zap.Error(err))
 	}
 
-	// 确保bucket存在
+	// 确保 bucket存在
 	if storage, ok := minioStorage.(*minioAdapter.MinIOStorage); ok {
 		bucket := viper.GetString("minio.bucket")
 		region := viper.GetString("minio.region")
 		if err := storage.EnsureBucket(context.Background(), bucket, region); err != nil {
-			log.Printf("Warning: Failed to ensure bucket: %v", err)
+			logger.Warn("Failed to ensure bucket", zap.Error(err))
 		}
 	}
 
@@ -72,11 +98,11 @@ func main() {
 	// 初始化消息服务客户端
 	msgAddr := viper.GetString("grpc.message_addr")
 	if msgAddr == "" {
-		log.Fatalf("message service address is required")
+		logger.Fatal("message service address is required")
 	}
 	msgConn, err := grpc.Dial(msgAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect message service: %v", err)
+		logger.Fatal("Failed to connect message service", zap.Error(err))
 	}
 	defer msgConn.Close()
 	messageClient := imv1.NewMessageServiceClient(msgConn)
@@ -97,9 +123,9 @@ func main() {
 		Handler: router,
 	}
 	go func() {
-		log.Printf("HTTP server starting on port %d", httpPort)
+		logger.Info("HTTP server starting", zap.Int("port", httpPort))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			logger.Fatal("HTTP server failed", zap.Error(err))
 		}
 	}()
 
@@ -107,7 +133,7 @@ func main() {
 	grpcPort := viper.GetInt("server.grpc_port")
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		logger.Fatal("Failed to listen", zap.Error(err))
 	}
 
 	server := grpc.NewServer()
@@ -115,9 +141,9 @@ func main() {
 	grpcServer.RegisterFileServiceServer(server, fileServer)
 
 	go func() {
-		log.Printf("gRPC server starting on port %d", grpcPort)
+		logger.Info("gRPC server starting", zap.Int("port", grpcPort))
 		if err := server.Serve(listener); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
+			logger.Fatal("gRPC server failed", zap.Error(err))
 		}
 	}()
 
@@ -125,7 +151,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down servers...")
+	logger.Info("Shutting down servers...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -133,7 +159,7 @@ func main() {
 	httpServer.Shutdown(ctx)
 	server.GracefulStop()
 
-	log.Println("Servers exited properly")
+	logger.Info("Servers exited properly")
 }
 
 func loadConfig() error {
@@ -155,7 +181,7 @@ func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
 	
 	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return nil, err

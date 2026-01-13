@@ -6,6 +6,7 @@ require (
 	github.com/EthanQC/IM/api v0.0.0
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/spf13/viper v1.20.1
+	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 )

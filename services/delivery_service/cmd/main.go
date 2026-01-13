@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -14,10 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/EthanQC/IM/pkg/zlog"
 	"github.com/EthanQC/IM/services/delivery_service/internal/adapters/in/ws"
 	"github.com/EthanQC/IM/services/delivery_service/internal/adapters/out/db"
 	"github.com/EthanQC/IM/services/delivery_service/internal/adapters/out/mq"
@@ -29,19 +31,43 @@ import (
 func main() {
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "delivery-service"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("delivery_service starting", zap.String("env", env))
 
 	// 初始化数据库
 	database, err := initDB()
 	if err != nil {
-		log.Fatalf("Failed to init database: %v", err)
+		logger.Fatal("Failed to init database", zap.Error(err))
 	}
 
 	// 初始化Redis
 	redisClient, err := initRedis()
 	if err != nil {
-		log.Fatalf("Failed to init redis: %v", err)
+		logger.Fatal("Failed to init redis", zap.Error(err))
 	}
 
 	// 获取服务器地址（用于路由）
@@ -92,14 +118,14 @@ func main() {
 	groupID := viper.GetString("kafka.group_id")
 	consumer, err := mq.NewReliableKafkaConsumer(kafkaBrokers, groupID, deliveryUseCase)
 	if err != nil {
-		log.Fatalf("Failed to init kafka consumer: %v", err)
+		logger.Fatal("Failed to init kafka consumer", zap.Error(err))
 	}
 
 	// 启动Kafka消费者
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := consumer.Start(ctx); err != nil {
-		log.Fatalf("Failed to start kafka consumer: %v", err)
+		logger.Fatal("Failed to start kafka consumer", zap.Error(err))
 	}
 
 	// 初始化增强版WebSocket服务器
@@ -161,9 +187,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Delivery server starting on port %d", httpPort)
+		logger.Info("Delivery server starting", zap.Int("port", httpPort))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			logger.Fatal("HTTP server failed", zap.Error(err))
 		}
 	}()
 
@@ -171,17 +197,17 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		logger.Warn("HTTP server shutdown error", zap.Error(err))
 	}
 
 	if err := consumer.Stop(); err != nil {
-		log.Printf("Kafka consumer stop error: %v", err)
+		logger.Warn("Kafka consumer stop error", zap.Error(err))
 	}
 
 	// 停止信令服务
@@ -189,7 +215,7 @@ func main() {
 		su.Stop()
 	}
 
-	log.Println("Server exited properly")
+	logger.Info("Server exited properly")
 }
 
 func loadConfig() error {
@@ -211,7 +237,7 @@ func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
 
 	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return nil, err

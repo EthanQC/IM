@@ -77,20 +77,24 @@ func LoadConfig(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("配置错误：encoding 只能是 json/console")
 	}
 
-	if cfg.File.Path == "" {
-		return nil, fmt.Errorf("配置错误：file.path 不能为空")
+	// 如果启用了 stdout，允许不设置文件路径
+	if !cfg.Stdout && cfg.File.Path == "" {
+		return nil, fmt.Errorf("配置错误：stdout 为 false 时，file.path 不能为空")
 	}
 
-	if cfg.File.MaxSizeMB <= 0 {
-		return nil, fmt.Errorf("配置错误：file.max_size 必须大于 0")
-	}
+	// 如果设置了文件路径，验证其他文件相关配置
+	if cfg.File.Path != "" {
+		if cfg.File.MaxSizeMB <= 0 {
+			cfg.File.MaxSizeMB = 100 // 默认 100MB
+		}
 
-	if cfg.File.MaxBackups < 0 {
-		return nil, fmt.Errorf("配置错误：file.max_backups 不能为负数")
-	}
+		if cfg.File.MaxBackups < 0 {
+			cfg.File.MaxBackups = 60 // 默认 60 个
+		}
 
-	if cfg.File.MaxAgeDay < 0 {
-		return nil, fmt.Errorf("配置错误：file.max_age 不能为负数")
+		if cfg.File.MaxAgeDay < 0 {
+			cfg.File.MaxAgeDay = 30 // 默认 30 天
+		}
 	}
 
 	return &cfg, nil

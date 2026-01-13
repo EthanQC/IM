@@ -3,10 +3,10 @@ package mq
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/zap"
 
 	"github.com/EthanQC/IM/services/delivery_service/internal/domain/entity"
 	"github.com/EthanQC/IM/services/delivery_service/internal/ports/in"
@@ -66,7 +66,7 @@ func (c *KafkaMessageConsumer) Start(ctx context.Context) error {
 				return
 			default:
 				if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-					log.Printf("Error from consumer: %v", err)
+					zap.L().Warn("Error from consumer", zap.Error(err))
 				}
 				// 重置ready channel
 				c.ready = make(chan bool)
@@ -77,7 +77,7 @@ func (c *KafkaMessageConsumer) Start(ctx context.Context) error {
 
 	// 等待消费者准备就绪
 	<-c.ready
-	log.Println("Kafka consumer is ready")
+	zap.L().Info("Kafka consumer is ready")
 
 	return nil
 }
@@ -129,7 +129,7 @@ func (h *consumerGroupHandler) handleMessage(ctx context.Context, message *saram
 	case TopicMessageRevoked:
 		h.handleMessageRevoked(ctx, message.Value)
 	default:
-		log.Printf("Unknown topic: %s", message.Topic)
+		zap.L().Warn("Unknown topic", zap.String("topic", message.Topic))
 	}
 }
 
@@ -146,7 +146,7 @@ func (h *consumerGroupHandler) handleNewMessage(ctx context.Context, data []byte
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
-		log.Printf("Failed to unmarshal new message event: %v", err)
+		zap.L().Warn("Failed to unmarshal new message event", zap.Error(err))
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *consumerGroupHandler) handleNewMessage(ctx context.Context, data []byte
 	}
 
 	if err := h.deliveryUseCase.DeliverMessage(ctx, msgEvent); err != nil {
-		log.Printf("Failed to deliver message: %v", err)
+		zap.L().Warn("Failed to deliver message", zap.Error(err))
 	}
 }
 
@@ -177,7 +177,7 @@ func (h *consumerGroupHandler) handleMessageRead(ctx context.Context, data []byt
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
-		log.Printf("Failed to unmarshal message read event: %v", err)
+		zap.L().Warn("Failed to unmarshal message read event", zap.Error(err))
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *consumerGroupHandler) handleMessageRead(ctx context.Context, data []byt
 			continue
 		}
 		if err := h.deliveryUseCase.DeliverToUser(ctx, receiverID, payload); err != nil {
-			log.Printf("Failed to deliver read receipt: %v", err)
+			zap.L().Warn("Failed to deliver read receipt", zap.Error(err))
 		}
 	}
 }
@@ -211,7 +211,7 @@ func (h *consumerGroupHandler) handleMessageRevoked(ctx context.Context, data []
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
-		log.Printf("Failed to unmarshal message revoked event: %v", err)
+		zap.L().Warn("Failed to unmarshal message revoked event", zap.Error(err))
 		return
 	}
 
@@ -236,6 +236,6 @@ func (h *consumerGroupHandler) handleMessageRevoked(ctx context.Context, data []
 	}
 
 	if err := h.deliveryUseCase.DeliverMessage(ctx, msgEvent); err != nil {
-		log.Printf("Failed to deliver revoke notification: %v", err)
+		zap.L().Warn("Failed to deliver revoke notification", zap.Error(err))
 	}
 }

@@ -42,6 +42,9 @@ websocket:
   max_message_size: 65536
 
 log:
+  service: "delivery-service"
   level: debug
-  format: json
-  output: stdout
+  encoding: console
+  stdout: true
+  file:
+    path: ""

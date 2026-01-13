@@ -3,19 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	kafka "github.com/segmentio/kafka-go"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	"github.com/EthanQC/IM/pkg/zlog"
 	grpcAdapter "github.com/EthanQC/IM/services/identity_service/internal/adapters/in/gRPC"
 	httpAdapter "github.com/EthanQC/IM/services/identity_service/internal/adapters/in/http"
 	aliyunSms "github.com/EthanQC/IM/services/identity_service/internal/adapters/out/aliyun"
@@ -78,12 +80,33 @@ func main() {
 	viper.AddConfigPath("../configs")
 	viper.SetDefault("server.grpc_port", 9080)
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("读取配置文件失败: %v", err)
+		fmt.Fprintf(os.Stderr, "读取配置文件失败: %v\n", err)
+		os.Exit(1)
 	}
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
-		log.Fatalf("解析配置失败: %v", err)
+		fmt.Fprintf(os.Stderr, "解析配置失败: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "identity-service"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("identity_service starting", zap.String("env", env))
 
 	// 构造监听地址
 	httpAddr := fmt.Sprintf(":%d", cfg.Server.HTTPPort)
@@ -92,20 +115,22 @@ func main() {
 	// 初始化 MySQL
 	db, err := gorm.Open(mysqlDriver.Open(cfg.Mysql.DSN), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("连接 MySQL 失败: %v", err)
+		logger.Fatal("连接 MySQL 失败", zap.Error(err))
 	}
 	if cfg.Server.Mode != "release" {
 		if err := db.AutoMigrate(&mysqlRepo.RefreshTokenModel{}); err != nil {
-			log.Fatalf("初始化 refresh_tokens 表失败: %v", err)
+			logger.Fatal("初始化 refresh_tokens 表失败", zap.Error(err))
 		}
 	}
+	logger.Info("MySQL 连接成功")
 
 	// 初始化 Redis
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password, DB: cfg.Redis.DB})
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("连接 Redis 失败: %v", err)
+		logger.Fatal("连接 Redis 失败", zap.Error(err))
 	}
+	logger.Info("Redis 连接成功")
 
 	// JWT 管理器
 	jwtMgr := jwt.NewManager(cfg.JWT.Secret)
@@ -173,16 +198,16 @@ func main() {
 	httpAdapter.NewSMSHandler(smsSendUC).RegisterRoutes(mux)
 
 	go func() {
-		log.Printf("HTTP 服务启动: %s", httpAddr)
+		logger.Info("HTTP 服务启动", zap.String("addr", httpAddr))
 		if err := http.ListenAndServe(httpAddr, mux); err != nil {
-			log.Fatalf("HTTP 服务失败: %v", err)
+			logger.Fatal("HTTP 服务失败", zap.Error(err))
 		}
 	}()
 
 	// 启动 gRPC 服务
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatalf("监听 gRPC 失败: %v", err)
+		logger.Fatal("监听 gRPC 失败", zap.Error(err))
 	}
 	grpcServer := grpc.NewServer()
 	grpcAdapter.NewAuthServer(
@@ -191,8 +216,8 @@ func main() {
 		contactUC,
 		smsSendUC,
 	).RegisterServer(grpcServer)
-	log.Printf("gRPC 服务启动: %s", grpcAddr)
+	logger.Info("gRPC 服务启动", zap.String("addr", grpcAddr))
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("gRPC 服务失败: %v", err)
+		logger.Fatal("gRPC 服务失败", zap.Error(err))
 	}
 }

@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
+	"go.uber.org/zap"
 
 	"github.com/EthanQC/IM/services/delivery_service/internal/domain/entity"
 	"github.com/EthanQC/IM/services/delivery_service/internal/ports/in"
@@ -114,7 +114,7 @@ func (c *ReliableKafkaConsumer) Start(ctx context.Context) error {
 				return
 			default:
 				if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-					log.Printf("Error from consumer: %v", err)
+					zap.L().Warn("Error from consumer", zap.Error(err))
 				}
 				// 重置ready channel
 				c.ready = make(chan bool)
@@ -132,7 +132,7 @@ func (c *ReliableKafkaConsumer) Start(ctx context.Context) error {
 
 	// 等待消费者准备就绪
 	<-c.ready
-	log.Println("Reliable Kafka consumer is ready")
+	zap.L().Info("Reliable Kafka consumer is ready")
 
 	return nil
 }
@@ -145,7 +145,7 @@ func (c *ReliableKafkaConsumer) Stop() error {
 	c.wg.Wait()
 
 	if err := c.producer.Close(); err != nil {
-		log.Printf("Close producer error: %v", err)
+		zap.L().Warn("Close producer error", zap.Error(err))
 	}
 
 	return c.consumerGroup.Close()
@@ -193,7 +193,7 @@ func (h *reliableConsumerHandler) ConsumeClaim(session sarama.ConsumerGroupSessi
 
 			// 处理消息，带重试逻辑
 			if err := h.handleMessageWithRetry(session.Context(), message); err != nil {
-				log.Printf("Message handling failed after retries: %v", err)
+				zap.L().Warn("Message handling failed after retries", zap.Error(err))
 			}
 
 			// 手动提交offset
@@ -299,8 +299,11 @@ func (h *reliableConsumerHandler) sendToRetry(originalTopic, originalKey string,
 		return fmt.Errorf("send to retry queue failed: %w", err)
 	}
 
-	log.Printf("Message sent to retry queue: topic=%s, key=%s, retryCount=%d, nextRetryAt=%d",
-		originalTopic, originalKey, retryCount, nextRetryAt)
+	zap.L().Info("Message sent to retry queue",
+		zap.String("topic", originalTopic),
+		zap.String("key", originalKey),
+		zap.Int("retryCount", retryCount),
+		zap.Int64("nextRetryAt", nextRetryAt))
 
 	return nil
 }
@@ -336,8 +339,10 @@ func (h *reliableConsumerHandler) sendToDeadLetter(originalTopic, originalKey st
 		return fmt.Errorf("send to dead letter queue failed: %w", err)
 	}
 
-	log.Printf("Message sent to dead letter queue: topic=%s, key=%s, error=%s",
-		originalTopic, originalKey, errorMsg)
+	zap.L().Warn("Message sent to dead letter queue",
+		zap.String("topic", originalTopic),
+		zap.String("key", originalKey),
+		zap.String("error", errorMsg))
 
 	return nil
 }

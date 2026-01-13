@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/EthanQC/IM/services/message_service/internal/ports/out"
 )
@@ -75,7 +76,7 @@ func (w *Worker) Start() error {
 	w.wg.Add(1)
 	go w.cleanupLoop()
 
-	log.Printf("Outbox worker started with %d workers", w.config.WorkerCount)
+	zap.L().Info("Outbox worker started", zap.Int("workerCount", w.config.WorkerCount))
 	return nil
 }
 
@@ -93,7 +94,7 @@ func (w *Worker) Stop() {
 		w.cancel()
 	}
 	w.wg.Wait()
-	log.Println("Outbox worker stopped")
+	zap.L().Info("Outbox worker stopped")
 }
 
 // pollLoop 轮询循环
@@ -109,7 +110,9 @@ func (w *Worker) pollLoop(workerID int) {
 			return
 		case <-ticker.C:
 			if err := w.processBatch(); err != nil {
-				log.Printf("Worker %d: process batch error: %v", workerID, err)
+				zap.L().Warn("Worker process batch error",
+					zap.Int("workerID", workerID),
+					zap.Error(err))
 			}
 		}
 	}
@@ -131,7 +134,9 @@ func (w *Worker) processBatch() error {
 
 	for _, event := range events {
 		if err := w.processEvent(ctx, event); err != nil {
-			log.Printf("Process event %d failed: %v", event.ID, err)
+			zap.L().Warn("Process event failed",
+				zap.Uint64("eventID", event.ID),
+				zap.Error(err))
 		}
 	}
 
@@ -149,18 +154,18 @@ func (w *Worker) processEvent(ctx context.Context, event *out.OutboxEvent) error
 	case "message.revoked":
 		err = w.publishMessageRevoked(ctx, event)
 	default:
-		log.Printf("Unknown event type: %s", event.EventType)
+		zap.L().Warn("Unknown event type", zap.String("eventType", event.EventType))
 		return nil
 	}
 
 	if err != nil {
 		if incrErr := w.outboxRepo.IncrRetryCount(ctx, event.ID); incrErr != nil {
-			log.Printf("Incr retry count failed: %v", incrErr)
+			zap.L().Warn("Incr retry count failed", zap.Error(incrErr))
 		}
 
 		if event.RetryCount >= w.config.MaxRetries {
 			if markErr := w.outboxRepo.MarkAsFailed(ctx, event.ID, err.Error()); markErr != nil {
-				log.Printf("Mark as failed error: %v", markErr)
+				zap.L().Warn("Mark as failed error", zap.Error(markErr))
 			}
 			return fmt.Errorf("max retries exceeded: %w", err)
 		}
@@ -211,7 +216,7 @@ func (w *Worker) cleanupLoop() {
 			return
 		case <-ticker.C:
 			if err := w.cleanup(); err != nil {
-				log.Printf("Cleanup error: %v", err)
+				zap.L().Warn("Cleanup error", zap.Error(err))
 			}
 		}
 	}
@@ -228,7 +233,7 @@ func (w *Worker) cleanup() error {
 	}
 
 	if deleted > 0 {
-		log.Printf("Cleaned up %d old outbox events", deleted)
+		zap.L().Info("Cleaned up old outbox events", zap.Int64("count", deleted))
 	}
 
 	return nil

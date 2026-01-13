@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"gorm.io/driver/mysql"
@@ -22,6 +23,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	imv1 "github.com/EthanQC/IM/api/gen/im/v1"
+	"github.com/EthanQC/IM/pkg/zlog"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/in/grpc/server"
 	httpAdapter "github.com/EthanQC/IM/services/message_service/internal/adapters/in/http"
 	"github.com/EthanQC/IM/services/message_service/internal/adapters/in/ws"
@@ -36,26 +38,50 @@ import (
 func main() {
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// 初始化日志
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "dev"
+	}
+	os.Setenv("APP_ENV", env)
+	logCfgPath := filepath.Join(".", "configs", fmt.Sprintf("config.%s.yaml", env))
+	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
+		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
+	}
+	
+	logCfg, err := zlog.LoadConfig(logCfgPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
+		os.Exit(1)
+	}
+	logCfg.Service = "message-service"
+	zlog.MustInitGlobal(*logCfg)
+	defer zap.L().Sync()
+
+	logger := zap.L()
+	logger.Info("message_service starting", zap.String("env", env))
 
 	// 初始化数据库
 	database, err := initDB()
 	if err != nil {
-		log.Fatalf("Failed to init database: %v", err)
+		logger.Fatal("Failed to init database", zap.Error(err))
 	}
 
 	// 初始化Redis
 	redisClient, err := initRedis()
 	if err != nil {
-		log.Fatalf("Failed to init redis: %v", err)
+		logger.Fatal("Failed to init redis", zap.Error(err))
 	}
 
 	// 初始化Kafka发布器
 	kafkaBrokers := viper.GetStringSlice("kafka.brokers")
 	eventPublisher, err := mq.NewKafkaEventPublisher(kafkaBrokers)
 	if err != nil {
-		log.Fatalf("Failed to init kafka publisher: %v", err)
+		logger.Fatal("Failed to init kafka publisher", zap.Error(err))
 	}
 
 	// 初始化仓储层
@@ -74,7 +100,7 @@ func main() {
 	var memberRepo out.ConversationMemberRepository
 	convAddr := viper.GetString("grpc.conversation_addr")
 	if convAddr == "" {
-		log.Fatalf("conversation service address is required")
+		logger.Fatal("conversation service address is required")
 	}
 	convTimeout := viper.GetDuration("grpc.timeout")
 	if convTimeout == 0 {
@@ -82,7 +108,7 @@ func main() {
 	}
 	convConn, err := grpc.Dial(convAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect conversation service: %v", err)
+		logger.Fatal("Failed to connect conversation service", zap.Error(err))
 	}
 	defer convConn.Close()
 	memberRepo = grpcOut.NewConversationClient(imv1.NewConversationServiceClient(convConn), convTimeout)
@@ -137,9 +163,9 @@ func main() {
 		Handler: router,
 	}
 	go func() {
-		log.Printf("HTTP server starting on port %d", httpPort)
+		logger.Info("HTTP server starting", zap.Int("port", httpPort))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			logger.Fatal("HTTP server failed", zap.Error(err))
 		}
 	}()
 
@@ -147,7 +173,7 @@ func main() {
 	grpcPort := viper.GetInt("server.grpc_port")
 	grpcListener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		log.Fatalf("Failed to listen on gRPC port: %v", err)
+		logger.Fatal("Failed to listen on gRPC port", zap.Error(err))
 	}
 
 	grpcServer := grpc.NewServer()
@@ -155,9 +181,9 @@ func main() {
 	server.RegisterMessageServiceServer(grpcServer, messageGrpcServer)
 
 	go func() {
-		log.Printf("gRPC server starting on port %d", grpcPort)
+		logger.Info("gRPC server starting", zap.Int("port", grpcPort))
 		if err := grpcServer.Serve(grpcListener); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
+			logger.Fatal("gRPC server failed", zap.Error(err))
 		}
 	}()
 
@@ -165,17 +191,17 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down servers...")
+	logger.Info("Shutting down servers...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		logger.Warn("HTTP server shutdown error", zap.Error(err))
 	}
 	grpcServer.GracefulStop()
 
-	log.Println("Servers exited properly")
+	logger.Info("Servers exited properly")
 }
 
 func loadConfig() error {
@@ -201,7 +227,7 @@ func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database: %w", err)
