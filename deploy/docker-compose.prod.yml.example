@@ -1,5 +1,6 @@
-# IM 云端部署 Docker Compose 配置
-# 针对 2核2G 小内存服务器优化
+# IM 生产环境 Docker Compose
+# 使用 Kafka KRaft 模式（无需 ZooKeeper）
+# 针对小内存服务器优化
 
 services:
   # ==================== 基础设施 ====================
@@ -14,10 +15,11 @@ services:
       - --default-authentication-plugin=mysql_native_password
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-      - --innodb-buffer-pool-size=128M
-      - --max-connections=100
-      - --key-buffer-size=16M
-      - --table-open-cache=64
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=200
+      - --key-buffer-size=32M
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
@@ -43,8 +45,10 @@ services:
       - --save 300 1
       - --appendonly yes
       - --requirepass ${REDIS_PASSWORD}
-      - --maxmemory 128mb
+      - --maxmemory 256mb
       - --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -55,11 +59,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 150M
+          memory: 300M
     networks:
       - im_network
 
-  # 使用 KRaft 模式的 Kafka（无需 Zookeeper，节省内存）
+  # Kafka KRaft 模式（无需 ZooKeeper，节省 ~300MB 内存）
   kafka:
     image: bitnami/kafka:3.6
     container_name: im_kafka
@@ -73,12 +77,13 @@ services:
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_HEAP_OPTS=-Xmx512m -Xms512m
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
       - kafka_data:/bitnami/kafka
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -86,7 +91,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 350M
+          memory: 600M
     networks:
       - im_network
 
@@ -111,7 +116,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 256M
     networks:
       - im_network
 
@@ -139,7 +144,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
     networks:
       - im_network
 
@@ -165,7 +170,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
     networks:
       - im_network
 
@@ -192,7 +197,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
     networks:
       - im_network
 
@@ -215,7 +220,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
     networks:
       - im_network
 
@@ -234,7 +239,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 48M
+          memory: 96M
     networks:
       - im_network
 
@@ -261,7 +266,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 48M
+          memory: 96M
     networks:
       - im_network
 
@@ -280,7 +285,7 @@ services:
       - FILE_SERVICE_ADDR=file-service:9085
     ports:
       - "80:8080"
-      - "8083:8083"  # WebSocket
+      - "8083:8083"
     depends_on:
       - identity-service
       - conversation-service
@@ -291,7 +296,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
     networks:
       - im_network
 

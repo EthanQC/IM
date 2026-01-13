@@ -37,8 +37,6 @@ web/chat-server/src/assets/cert/*
 
 internal/service/kafka/start.bat
 
-*.sh
-
 *.ext
 
 # IDE 和编辑器文件
@@ -66,6 +64,12 @@ logs/
 **/configs/config.dev.yaml
 **/configs/config.prod.yaml
 !**/configs/*.example
+
+# 部署配置文件（只保留 example，实际配置从 example 复制后本地修改）
+deploy/docker-compose.dev.yml
+deploy/docker-compose.prod.yml
+deploy/.env
+!deploy/*.example
 
 # 证书和密钥文件
 *.pem

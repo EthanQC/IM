@@ -273,7 +273,7 @@ docker compose -f docker-compose.dev.yml up -d
 # 检查容器状态
 docker ps
 
-# 应该看到 5 个容器：im_mysql, im_redis, im_kafka, im_zookeeper, im_minio
+# 应该看到 4 个容器：im_mysql, im_redis, im_kafka, im_minio
 ```
 
 **基础设施服务信息：**
@@ -283,7 +283,6 @@ docker ps
 | MySQL | 3306 | localhost:3306 | root / imdev |
 | Redis | 6379 | localhost:6379 | 无密码 |
 | Kafka | 29092 | localhost:29092 | - |
-| Zookeeper | 2181 | localhost:2181 | - |
 | MinIO API | 9000 | localhost:9000 | admin / admin123 |
 | MinIO 控制台 | 9001 | http://localhost:9001 | admin / admin123 |
 
@@ -328,7 +327,6 @@ cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 - 需要认证的接口，先登录获取 token，然后点击 "Authorize" 按钮输入
 
 ### 部署上云
-
 #### 服务器要求
 
 | 配置 | 最低要求 | 推荐配置 |
@@ -339,7 +337,7 @@ cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 | 系统 | Ubuntu 22.04 | Ubuntu 22.04 |
 | 带宽 | 1Mbps | 5Mbps |
 
-#### 一、服务器初始化
+#### 服务器初始化
 
 ```bash
 # 1. SSH 登录服务器
@@ -350,12 +348,42 @@ curl -fsSL https://raw.githubusercontent.com/EthanQC/IM/main/deploy/scripts/serv
 
 # 脚本会自动完成：
 # - 安装 Docker 和 Docker Compose
-# - 配置 2GB Swap（小内存必需）
+# - 配置 Swap（根据内存大小自动调整）
 # - 优化系统参数
-# - 创建部署目录 /root/im-deploy
 ```
 
-#### 二、配置 GitHub Secrets
+#### 克隆项目并配置
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/EthanQC/IM.git
+cd IM/deploy
+
+# 2. 复制配置模板
+cp docker-compose.prod.yml.example docker-compose.prod.yml
+cp .env.example .env
+
+# 3. 编辑环境变量（修改密码等敏感信息）
+vim .env
+
+# 4. 编辑 docker-compose 配置（可选，按需调整内存限制等）
+vim docker-compose.prod.yml
+```
+
+#### 首次部署
+
+```bash
+# 运行部署脚本
+./scripts/deploy.sh
+
+# 脚本会自动：
+# - 检查配置文件
+# - 构建服务镜像
+# - 启动所有容器
+# - 验证服务状态
+```
+
+#### 配置 GitHub CI/CD
 
 在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 中添加以下 Secrets：
 
@@ -365,56 +393,9 @@ curl -fsSL https://raw.githubusercontent.com/EthanQC/IM/main/deploy/scripts/serv
 | `SERVER_USER` | SSH 用户名 | `root` |
 | `SERVER_SSH_KEY` | SSH 私钥 | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 
-#### 三、上传部署文件
+配置完成后，每次推送到 `main` 分支会自动触发部署
 
-```bash
-# 在本地项目目录执行
-cd deploy
-
-# 上传配置文件到服务器
-scp docker-compose.cloud.yml root@your_server_ip:/root/im-deploy/
-scp .env.example root@your_server_ip:/root/im-deploy/.env
-scp -r sql root@your_server_ip:/root/im-deploy/
-
-# 登录服务器编辑 .env
-ssh root@your_server_ip
-cd /root/im-deploy
-vim .env  # 修改密码等配置
-
-# 设置 GitHub 仓库名（替换为你的仓库）
-sed -i 's|GITHUB_REPO=.*|GITHUB_REPO=你的用户名/IM|' .env
-```
-
-#### 四、触发 CI/CD 部署
-
-```bash
-# 推送代码到 main 分支，自动触发部署
-git push origin main
-
-# 或者手动触发（GitHub Actions 页面）
-# Actions -> CD -> Run workflow
-```
-
-#### 五、手动部署（可选）
-
-如果不想使用 CI/CD，可以手动部署：
-
-```bash
-# 登录服务器
-ssh root@your_server_ip
-cd /root/im-deploy
-
-# 构建并启动（首次部署）
-docker compose -f docker-compose.cloud.yml up -d --build
-
-# 查看日志
-docker compose -f docker-compose.cloud.yml logs -f
-
-# 查看服务状态
-docker compose -f docker-compose.cloud.yml ps
-```
-
-#### 六、验证部署
+#### 验证部署
 
 ```bash
 # 检查 API Gateway
@@ -425,29 +406,32 @@ curl http://your_server_ip/healthz
 # 浏览器打开: http://your_server_ip/swagger
 ```
 
-#### 七、常用运维命令
+#### 常用运维命令
 
 ```bash
+# 进入部署目录
+cd ~/IM/deploy
+
 # 查看所有服务状态
-docker compose -f docker-compose.cloud.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 # 查看服务日志
-docker compose -f docker-compose.cloud.yml logs -f api-gateway
-docker compose -f docker-compose.cloud.yml logs -f message-service
+docker compose -f docker-compose.prod.yml logs -f api-gateway
+docker compose -f docker-compose.prod.yml logs -f message-service
 
 # 重启单个服务
-docker compose -f docker-compose.cloud.yml restart api-gateway
+docker compose -f docker-compose.prod.yml restart api-gateway
 
-# 更新镜像并重启
-docker compose -f docker-compose.cloud.yml pull
-docker compose -f docker-compose.cloud.yml up -d
+# 手动更新部署
+./scripts/deploy.sh update
 
 # 停止所有服务
-docker compose -f docker-compose.cloud.yml down
+docker compose -f docker-compose.prod.yml down
 
 # 停止并删除数据（危险！）
-docker compose -f docker-compose.cloud.yml down -v
+docker compose -f docker-compose.prod.yml down -v
 ```
+
 
 #### 内存分配（2G服务器）
 
@@ -460,7 +444,6 @@ docker compose -f docker-compose.cloud.yml down -v
 | 7个微服务 | ~420MB | 每个约60MB |
 | 系统+Swap | ~500MB | 系统预留 |
 | **总计** | ~2GB | |
-
 
 ---
 
