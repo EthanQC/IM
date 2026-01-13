@@ -21,11 +21,11 @@ const (
 
 // KafkaMessageConsumer Kafka消息消费者
 type KafkaMessageConsumer struct {
-	consumerGroup sarama.ConsumerGroup
-	topics        []string
+	consumerGroup   sarama.ConsumerGroup
+	topics          []string
 	deliveryUseCase in.DeliveryUseCase
-	ready         chan bool
-	cancel        context.CancelFunc
+	ready           chan bool
+	cancel          context.CancelFunc
 }
 
 // NewKafkaMessageConsumer 创建Kafka消息消费者
@@ -169,11 +169,11 @@ func (h *consumerGroupHandler) handleNewMessage(ctx context.Context, data []byte
 
 func (h *consumerGroupHandler) handleMessageRead(ctx context.Context, data []byte) {
 	var event struct {
-		ConversationID uint64 `json:"conversation_id"`
-		UserID         uint64 `json:"user_id"`
+		ConversationID uint64   `json:"conversation_id"`
+		UserID         uint64   `json:"user_id"`
 		ReceiverIDs    []uint64 `json:"receiver_ids"`
-		ReadSeq        uint64 `json:"read_seq"`
-		ReadAt         int64  `json:"read_at"`
+		ReadSeq        uint64   `json:"read_seq"`
+		ReadAt         int64    `json:"read_at"`
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {

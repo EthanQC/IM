@@ -14,21 +14,21 @@ import (
 
 // WorkerConfig Outbox Worker 配置
 type WorkerConfig struct {
-	PollInterval   time.Duration
-	BatchSize      int
-	MaxRetries     int
-	CleanupAfter   time.Duration
-	WorkerCount    int
+	PollInterval time.Duration
+	BatchSize    int
+	MaxRetries   int
+	CleanupAfter time.Duration
+	WorkerCount  int
 }
 
 // DefaultWorkerConfig 默认配置
 func DefaultWorkerConfig() WorkerConfig {
 	return WorkerConfig{
-		PollInterval:   100 * time.Millisecond,
-		BatchSize:      100,
-		MaxRetries:     5,
-		CleanupAfter:   7 * 24 * time.Hour,
-		WorkerCount:    2,
+		PollInterval: 100 * time.Millisecond,
+		BatchSize:    100,
+		MaxRetries:   5,
+		CleanupAfter: 7 * 24 * time.Hour,
+		WorkerCount:  2,
 	}
 }
 

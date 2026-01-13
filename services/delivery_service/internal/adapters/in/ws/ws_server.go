@@ -36,12 +36,12 @@ type WSMessageType string
 
 const (
 	// 客户端消息类型
-	MsgTypePing       WSMessageType = "ping"
-	MsgTypeAck        WSMessageType = "ack"
-	MsgTypeBatchAck   WSMessageType = "batch_ack"
-	MsgTypeSync       WSMessageType = "sync"
-	MsgTypeSignaling  WSMessageType = "signaling"  // WebRTC信令
-	
+	MsgTypePing      WSMessageType = "ping"
+	MsgTypeAck       WSMessageType = "ack"
+	MsgTypeBatchAck  WSMessageType = "batch_ack"
+	MsgTypeSync      WSMessageType = "sync"
+	MsgTypeSignaling WSMessageType = "signaling" // WebRTC信令
+
 	// 服务端消息类型
 	MsgTypePong       WSMessageType = "pong"
 	MsgTypeMessage    WSMessageType = "message"
@@ -54,9 +54,9 @@ const (
 // WSMessage WebSocket消息
 type WSMessage struct {
 	Type WSMessageType   `json:"type"`
-	ID   string          `json:"id,omitempty"`   // 消息ID，用于ACK
+	ID   string          `json:"id,omitempty"` // 消息ID，用于ACK
 	Data json.RawMessage `json:"data,omitempty"`
-	Ts   int64           `json:"ts,omitempty"`   // 时间戳
+	Ts   int64           `json:"ts,omitempty"` // 时间戳
 }
 
 // AckData ACK数据
@@ -79,24 +79,24 @@ type SyncData struct {
 
 // EnhancedWSConnection 增强版WebSocket连接
 type EnhancedWSConnection struct {
-	conn         *websocket.Conn
-	userID       uint64
-	deviceID     string
-	platform     string
-	serverAddr   string
-	send         chan []byte
-	closed       int32
-	mu           sync.Mutex
-	lastPingAt   time.Time
-	lastPongAt   time.Time
-	connectedAt  time.Time
-	
+	conn        *websocket.Conn
+	userID      uint64
+	deviceID    string
+	platform    string
+	serverAddr  string
+	send        chan []byte
+	closed      int32
+	mu          sync.Mutex
+	lastPingAt  time.Time
+	lastPongAt  time.Time
+	connectedAt time.Time
+
 	// 依赖注入
-	connManager  out.ConnectionManager
-	connUseCase  in.ConnectionUseCase
-	syncUseCase  in.SyncUseCase
-	ackUseCase   in.AckUseCase
-	signalingUC  in.SignalingUseCase
+	connManager out.ConnectionManager
+	connUseCase in.ConnectionUseCase
+	syncUseCase in.SyncUseCase
+	ackUseCase  in.AckUseCase
+	signalingUC in.SignalingUseCase
 }
 
 func NewEnhancedWSConnection(
@@ -235,12 +235,12 @@ func (c *EnhancedWSConnection) cleanup() {
 	if c.connManager != nil {
 		c.connManager.Unregister(c.userID, c.deviceID)
 	}
-	
+
 	// 通知用户离线
 	if c.connUseCase != nil {
 		c.connUseCase.UserDisconnect(context.Background(), c.userID, c.deviceID)
 	}
-	
+
 	zap.L().Info("Connection cleanup",
 		zap.Uint64("userID", c.userID),
 		zap.String("deviceID", c.deviceID))
@@ -258,19 +258,19 @@ func (c *EnhancedWSConnection) handleMessage(data []byte) {
 	switch msg.Type {
 	case MsgTypePing:
 		c.handlePing(msg.ID)
-		
+
 	case MsgTypeAck:
 		c.handleAck(ctx, msg.ID, msg.Data)
-		
+
 	case MsgTypeBatchAck:
 		c.handleBatchAck(ctx, msg.ID, msg.Data)
-		
+
 	case MsgTypeSync:
 		c.handleSync(ctx, msg.ID, msg.Data)
-		
+
 	case MsgTypeSignaling:
 		c.handleSignaling(ctx, msg.ID, msg.Data)
-		
+
 	default:
 		c.sendError(msg.ID, "unknown message type")
 	}
@@ -384,7 +384,7 @@ func (c *EnhancedWSConnection) handleSignaling(ctx context.Context, msgID string
 
 	// 解析信令消息
 	var signalMsg struct {
-		Action  string          `json:"action"`  // offer, answer, ice_candidate, call, accept, reject, hangup
+		Action  string          `json:"action"` // offer, answer, ice_candidate, call, accept, reject, hangup
 		Payload json.RawMessage `json:"payload"`
 	}
 	if err := json.Unmarshal(data, &signalMsg); err != nil {
@@ -429,16 +429,16 @@ func (c *EnhancedWSConnection) sendError(msgID, errMsg string) {
 type EnhancedConnectionManager struct {
 	connections map[uint64]map[string]*EnhancedWSConnection // userID -> deviceID -> connection
 	mu          sync.RWMutex
-	
+
 	// 统计
-	totalConns     int64
-	totalMsgs      int64
-	
+	totalConns int64
+	totalMsgs  int64
+
 	// 依赖
-	connUseCase    in.ConnectionUseCase
-	syncUseCase    in.SyncUseCase
-	ackUseCase     in.AckUseCase
-	signalingUC    in.SignalingUseCase
+	connUseCase in.ConnectionUseCase
+	syncUseCase in.SyncUseCase
+	ackUseCase  in.AckUseCase
+	signalingUC in.SignalingUseCase
 }
 
 func NewEnhancedConnectionManager() *EnhancedConnectionManager {
@@ -480,12 +480,12 @@ func (m *EnhancedConnectionManager) Register(userID uint64, deviceID string, con
 
 	m.connections[userID][deviceID] = enhancedConn
 	atomic.AddInt64(&m.totalConns, 1)
-	
+
 	zap.L().Info("Connection registered",
 		zap.Uint64("userID", userID),
 		zap.String("deviceID", deviceID),
 		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
-	
+
 	return nil
 }
 
@@ -498,7 +498,7 @@ func (m *EnhancedConnectionManager) Unregister(userID uint64, deviceID string) e
 			conn.Close()
 			delete(devices, deviceID)
 			atomic.AddInt64(&m.totalConns, -1)
-			
+
 			if len(devices) == 0 {
 				delete(m.connections, userID)
 			}
@@ -509,7 +509,7 @@ func (m *EnhancedConnectionManager) Unregister(userID uint64, deviceID string) e
 		zap.Uint64("userID", userID),
 		zap.String("deviceID", deviceID),
 		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
-	
+
 	return nil
 }
 
@@ -545,7 +545,7 @@ func (m *EnhancedConnectionManager) Send(userID uint64, message []byte) error {
 				zap.Error(err))
 		}
 	}
-	
+
 	atomic.AddInt64(&m.totalMsgs, int64(len(devices)))
 	return nil
 }
@@ -579,7 +579,7 @@ func (m *EnhancedConnectionManager) Broadcast(userIDs []uint64, message []byte) 
 func (m *EnhancedConnectionManager) GetStats() map[string]int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	userCount := int64(len(m.connections))
 	return map[string]int64{
 		"total_connections": atomic.LoadInt64(&m.totalConns),
@@ -606,7 +606,7 @@ func NewEnhancedWSServer(
 	signalingUC in.SignalingUseCase,
 ) *EnhancedWSServer {
 	connManager.SetUseCases(connUseCase, syncUseCase, ackUseCase, signalingUC)
-	
+
 	return &EnhancedWSServer{
 		connManager: connManager,
 		connUseCase: connUseCase,
@@ -634,10 +634,10 @@ func (s *EnhancedWSServer) HandleConnection(w http.ResponseWriter, r *http.Reque
 	serverAddr := r.Host
 	wsConn := NewEnhancedWSConnection(conn, userID, deviceID, platform, serverAddr)
 	wsConn.SetDependencies(s.connManager, s.connUseCase, s.syncUseCase, s.ackUseCase, s.signalingUC)
-	
+
 	// 注册连接
 	s.connManager.Register(userID, deviceID, wsConn)
-	
+
 	// 通知用户上线
 	if s.connUseCase != nil {
 		s.connUseCase.UserConnect(r.Context(), userID, deviceID, platform, serverAddr)
@@ -649,9 +649,9 @@ func (s *EnhancedWSServer) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 	// 发送连接成功消息
 	welcomeData, _ := json.Marshal(map[string]interface{}{
-		"status":     "connected",
-		"user_id":    userID,
-		"device_id":  deviceID,
+		"status":      "connected",
+		"user_id":     userID,
+		"device_id":   deviceID,
 		"server_time": time.Now().UnixMilli(),
 	})
 	wsConn.sendJSON(WSMessage{

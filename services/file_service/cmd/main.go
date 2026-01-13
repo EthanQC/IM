@@ -45,7 +45,7 @@ func main() {
 	if _, err := os.Stat(logCfgPath); os.IsNotExist(err) {
 		logCfgPath = filepath.Join("..", "configs", fmt.Sprintf("config.%s.yaml", env))
 	}
-	
+
 	logCfg, err := zlog.LoadConfig(logCfgPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "加载日志配置失败: %v\n", err)
@@ -179,7 +179,7 @@ func loadConfig() error {
 
 func initDB() (*gorm.DB, error) {
 	dsn := viper.GetString("mysql.dsn")
-	
+
 	database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
