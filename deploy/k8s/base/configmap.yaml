@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: im-config
+  namespace: im
+data:
+  # 服务端口配置
+  API_GATEWAY_PORT: "8080"
+  DELIVERY_PORT: "8084"
+  
+  # gRPC 服务地址（集群内部通信）
+  GRPC_ADDR_IDENTITY: "identity-service:9080"
+  GRPC_ADDR_CONVERSATION: "conversation-service:9081"
+  GRPC_ADDR_MESSAGE: "message-service:9082"
+  HTTP_ADDR_MESSAGE: "http://message-service:8083"
+  GRPC_ADDR_PRESENCE: "presence-service:9084"
+  GRPC_ADDR_FILE: "file-service:9085"
+  
+  # 外部依赖地址（将在 overlay 中覆盖）
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "im_db"
+  REDIS_ADDR: "redis:6379"
+  KAFKA_BROKERS: "kafka:9092"
+  MINIO_ENDPOINT: "minio:9000"
+  
+  # WebSocket 配置
+  WEBSOCKET_HEARTBEAT_INTERVAL: "30s"
+  WEBSOCKET_WRITE_TIMEOUT: "10s"
+  WEBSOCKET_READ_TIMEOUT: "60s"
+  WEBSOCKET_MAX_MESSAGE_SIZE: "65536"
+  
+  # 日志级别
+  LOG_LEVEL: "info"
+  APP_ENV: "prod"

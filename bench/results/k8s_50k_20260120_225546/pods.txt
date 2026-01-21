@@ -1,0 +1,7 @@
+NAME                                READY   STATUS    RESTARTS      AGE   IP          NODE             NOMINATED NODE   READINESS GATES
+api-gateway-6fb497d6b-mh297         1/1     Running   1 (23h ago)   24h   10.1.0.40   docker-desktop   <none>           <none>
+api-gateway-6fb497d6b-nhgbn         1/1     Running   1 (23h ago)   24h   10.1.0.38   docker-desktop   <none>           <none>
+delivery-service-5c9dfd4b97-9h2tj   1/1     Running   2 (58m ago)   23h   10.1.0.35   docker-desktop   <none>           <none>
+delivery-service-5c9dfd4b97-hlxft   1/1     Running   2 (58m ago)   23h   10.1.0.37   docker-desktop   <none>           <none>
+delivery-service-5c9dfd4b97-rl259   1/1     Running   2 (58m ago)   24h   10.1.0.43   docker-desktop   <none>           <none>
+delivery-service-5c9dfd4b97-zmh2k   1/1     Running   2 (58m ago)   24h   10.1.0.42   docker-desktop   <none>           <none>

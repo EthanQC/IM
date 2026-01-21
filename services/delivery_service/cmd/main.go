@@ -179,6 +179,9 @@ func main() {
 		c.JSON(http.StatusOK, wsServer.GetStats())
 	})
 
+	// Prometheus 指标（导入 metrics 包后启用）
+	// router.GET("/metrics", metrics.GetMetrics().PrometheusHandler())
+
 	// 启动HTTP服务器
 	httpPort := viper.GetInt("server.http_port")
 	httpServer := &http.Server{

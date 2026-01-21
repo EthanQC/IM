@@ -1,0 +1,15 @@
+=== 压测数据收集摘要 ===
+时间: Tue Jan 20 23:03:51 CST 2026
+命名空间: im
+
+--- Pod 状态 ---
+      10 个 Pod
+
+--- 资源使用 ---
+未收集
+
+--- HPA 状态 ---
+NAME                   REFERENCE                     TARGETS                                     MINPODS   MAXPODS   REPLICAS   AGE
+api-gateway-hpa        Deployment/api-gateway        cpu: <unknown>/70%, memory: <unknown>/80%   2         10        2          24h
+delivery-service-hpa   Deployment/delivery-service   cpu: <unknown>/60%, memory: <unknown>/70%   2         20        8          24h
+

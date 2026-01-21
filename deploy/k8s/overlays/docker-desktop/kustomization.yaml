@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: im
+
+resources:
+  - ../../base
+  - nodeport.yaml
+  - delivery-configmap.yaml
+
+patches:
+  - path: patches/configmap.yaml
+  - path: patches/secret.yaml
+  - path: patches/deployment-delivery.yaml
+  - path: patches/deployment-gateway.yaml
+  - path: patches/wsbench.yaml
+
+# Docker Desktop 单节点环境：减少副本数
+replicas:
+  - name: api-gateway
+    count: 1
+  - name: delivery-service
+    count: 1
+
+commonAnnotations:
+  environment: docker-desktop
+  cluster-type: single-node
+
+images:
+  - name: im/api-gateway
+    newTag: latest
+  - name: im/delivery-service
+    newTag: latest
+  - name: im/wsbench
+    newTag: latest

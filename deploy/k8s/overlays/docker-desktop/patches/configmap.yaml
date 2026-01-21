@@ -1,0 +1,32 @@
+# ConfigMap 补丁：使用宿主机依赖 (host.docker.internal)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: im-config
+  namespace: im
+data:
+  # 外部依赖走宿主机
+  # Docker Desktop 提供 host.docker.internal 域名
+  MYSQL_HOST: "host.docker.internal"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "im_db"
+  REDIS_ADDR: "host.docker.internal:6379"
+  KAFKA_BROKERS: "host.docker.internal:29092"
+  MINIO_ENDPOINT: "host.docker.internal:9000"
+  
+  # 日志级别
+  LOG_LEVEL: "debug"
+  APP_ENV: "dev"
+  
+  # 服务端口
+  API_GATEWAY_PORT: "8080"
+  DELIVERY_PORT: "8084"
+  
+  # gRPC 服务地址（如果这些服务也在宿主机运行）
+  # 如果只部署 api-gateway 和 delivery，其他服务需要在宿主机运行
+  GRPC_ADDR_IDENTITY: "host.docker.internal:9080"
+  GRPC_ADDR_CONVERSATION: "host.docker.internal:9081"
+  GRPC_ADDR_MESSAGE: "host.docker.internal:9082"
+  HTTP_ADDR_MESSAGE: "http://host.docker.internal:8083"
+  GRPC_ADDR_PRESENCE: "host.docker.internal:9084"
+  GRPC_ADDR_FILE: "host.docker.internal:9085"

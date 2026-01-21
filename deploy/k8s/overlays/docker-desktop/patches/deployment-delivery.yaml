@@ -1,0 +1,27 @@
+# Delivery Service 补丁：Docker Desktop 环境优化
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delivery-service
+  namespace: im
+spec:
+  template:
+    spec:
+      containers:
+        - name: delivery-service
+          # 提升资源限制以支持更多连接
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 4000m
+              memory: 4Gi
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: delivery-config

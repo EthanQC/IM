@@ -1,0 +1,1309 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8080"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T14:49:41Z"
+    generateName: api-gateway-6fb497d6b-
+    generation: 1
+    labels:
+      app: api-gateway
+      pod-template-hash: 6fb497d6b
+    name: api-gateway-6fb497d6b-mh297
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: api-gateway-6fb497d6b
+      uid: a70340d5-77c5-4e27-ae9d-ac7be526ed65
+    resourceVersion: "36713"
+    uid: a42fe572-20c4-4ef8-80b6-8c4333a4dee2
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: JWT_SECRET
+        valueFrom:
+          secretKeyRef:
+            key: JWT_SECRET
+            name: im-secrets
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/api-gateway:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 5
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 8080
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: api-gateway
+      ports:
+      - containerPort: 8080
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 8080
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "2"
+          memory: 1Gi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-qt5sg
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - name: kube-api-access-qt5sg
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:42Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:49:41Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:45Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:45Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:49:41Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 200m
+        memory: 256Mi
+      containerID: docker://a7691929ebb184b35cc41c4d7b07baf8be51cd2499ac1b33e543da6dedda9c74
+      image: im/api-gateway:latest
+      imageID: docker-pullable://im/api-gateway@sha256:3140ecee04378e2975cca83652ae6b4f7cbf861fbd0f0d8aba1c0a18e9874a25
+      lastState:
+        terminated:
+          containerID: docker://9ca3da44437a1359a0d08fd11c078a115474f65bbe696bddd6bdf230591e32f6
+          exitCode: 0
+          finishedAt: "2026-01-19T15:25:01Z"
+          reason: Completed
+          startedAt: "2026-01-19T14:49:41Z"
+      name: api-gateway
+      ready: true
+      resources:
+        limits:
+          cpu: "2"
+          memory: 1Gi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+      restartCount: 1
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:57:40Z"
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-qt5sg
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.40
+    podIPs:
+    - ip: 10.1.0.40
+    qosClass: Burstable
+    startTime: "2026-01-19T14:49:41Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8080"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T14:40:40Z"
+    generateName: api-gateway-6fb497d6b-
+    generation: 1
+    labels:
+      app: api-gateway
+      pod-template-hash: 6fb497d6b
+    name: api-gateway-6fb497d6b-nhgbn
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: api-gateway-6fb497d6b
+      uid: a70340d5-77c5-4e27-ae9d-ac7be526ed65
+    resourceVersion: "36730"
+    uid: cd44e2ec-72ac-44dd-9c25-9ef2355c652c
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: JWT_SECRET
+        valueFrom:
+          secretKeyRef:
+            key: JWT_SECRET
+            name: im-secrets
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/api-gateway:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 5
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 8080
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: api-gateway
+      ports:
+      - containerPort: 8080
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /healthz
+          port: 8080
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "2"
+          memory: 1Gi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-5fqqp
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - name: kube-api-access-5fqqp
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:42Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:40:40Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:49Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:49Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:40:40Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 200m
+        memory: 256Mi
+      containerID: docker://8b51b9eb4c8d79627f85fd7b608660815593e88bacbf0e3a44f2828d23692c1e
+      image: im/api-gateway:latest
+      imageID: docker-pullable://im/api-gateway@sha256:3140ecee04378e2975cca83652ae6b4f7cbf861fbd0f0d8aba1c0a18e9874a25
+      lastState:
+        terminated:
+          containerID: docker://4e32a8b7283a7bdd0a26e5417876ac8998ea010a79f21dad6152f4b708ea98b4
+          exitCode: 0
+          finishedAt: "2026-01-19T15:25:01Z"
+          reason: Completed
+          startedAt: "2026-01-19T14:40:41Z"
+      name: api-gateway
+      ready: true
+      resources:
+        limits:
+          cpu: "2"
+          memory: 1Gi
+        requests:
+          cpu: 200m
+          memory: 256Mi
+      restartCount: 1
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:57:40Z"
+      volumeMounts:
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-5fqqp
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.38
+    podIPs:
+    - ip: 10.1.0.38
+    qosClass: Burstable
+    startTime: "2026-01-19T14:40:40Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      kubectl.kubernetes.io/restartedAt: "2026-01-19T22:51:59+08:00"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8084"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T15:04:05Z"
+    generateName: delivery-service-5c9dfd4b97-
+    generation: 1
+    labels:
+      app: delivery-service
+      pod-template-hash: 5c9dfd4b97
+    name: delivery-service-5c9dfd4b97-9h2tj
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: delivery-service-5c9dfd4b97
+      uid: df37f417-6bfe-4223-a479-b1120452c27d
+    resourceVersion: "36795"
+    uid: ed9037e5-90d6-4ae4-94ce-26c1abaaaeb6
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: MYSQL_DSN
+        valueFrom:
+          secretKeyRef:
+            key: MYSQL_DSN
+            name: im-secrets
+      - name: REDIS_ADDR
+        valueFrom:
+          configMapKeyRef:
+            key: REDIS_ADDR
+            name: im-config
+      - name: KAFKA_BROKERS
+        valueFrom:
+          configMapKeyRef:
+            key: KAFKA_BROKERS
+            name: im-config
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.podIP
+      - name: ADVERTISE_ADDR
+        value: $(POD_IP)
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/delivery-service:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 10
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: delivery-service
+      ports:
+      - containerPort: 8084
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-s7d8g
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - configMap:
+        defaultMode: 420
+        name: delivery-config
+      name: config
+    - name: kube-api-access-s7d8g
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:43Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T15:04:05Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:09Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:09Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T15:04:05Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 500m
+        memory: 512Mi
+      containerID: docker://1e6a085108bc84584f052c138619217b0c575af3babe0f3f327f39632429b34b
+      image: im/delivery-service:latest
+      imageID: docker-pullable://im/delivery-service@sha256:4c9a10f13959433e32f7d87b42b0231438b553d93c3ce24f85aae6f3cde730c7
+      lastState:
+        terminated:
+          containerID: docker://f5d8191c93464aad342e629bdf7a4dbd2c867d0bbb3793a49a24f79c72afee34
+          exitCode: 1
+          finishedAt: "2026-01-20T13:57:40Z"
+          reason: Error
+          startedAt: "2026-01-20T13:57:40Z"
+      name: delivery-service
+      ready: true
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      restartCount: 2
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:57:58Z"
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+        recursiveReadOnly: Disabled
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-s7d8g
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.35
+    podIPs:
+    - ip: 10.1.0.35
+    qosClass: Burstable
+    startTime: "2026-01-19T15:04:05Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      kubectl.kubernetes.io/restartedAt: "2026-01-19T22:51:59+08:00"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8084"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T15:04:05Z"
+    generateName: delivery-service-5c9dfd4b97-
+    generation: 1
+    labels:
+      app: delivery-service
+      pod-template-hash: 5c9dfd4b97
+    name: delivery-service-5c9dfd4b97-hlxft
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: delivery-service-5c9dfd4b97
+      uid: df37f417-6bfe-4223-a479-b1120452c27d
+    resourceVersion: "36805"
+    uid: 5c168816-be37-439b-91b7-cc535a33555f
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: MYSQL_DSN
+        valueFrom:
+          secretKeyRef:
+            key: MYSQL_DSN
+            name: im-secrets
+      - name: REDIS_ADDR
+        valueFrom:
+          configMapKeyRef:
+            key: REDIS_ADDR
+            name: im-config
+      - name: KAFKA_BROKERS
+        valueFrom:
+          configMapKeyRef:
+            key: KAFKA_BROKERS
+            name: im-config
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.podIP
+      - name: ADVERTISE_ADDR
+        value: $(POD_IP)
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/delivery-service:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 10
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: delivery-service
+      ports:
+      - containerPort: 8084
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-jphzm
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - configMap:
+        defaultMode: 420
+        name: delivery-config
+      name: config
+    - name: kube-api-access-jphzm
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:41Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T15:04:05Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:13Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:13Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T15:04:05Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 500m
+        memory: 512Mi
+      containerID: docker://579cc5dae9bd3681339f6edf058f5ff44697c7d73372d4e96639bc14cc2e2540
+      image: im/delivery-service:latest
+      imageID: docker-pullable://im/delivery-service@sha256:4c9a10f13959433e32f7d87b42b0231438b553d93c3ce24f85aae6f3cde730c7
+      lastState:
+        terminated:
+          containerID: docker://9a54ffd2454dac83783deeecb44aa73dad66b52ebeb72b655db918ff6fa32dbc
+          exitCode: 1
+          finishedAt: "2026-01-20T13:57:40Z"
+          reason: Error
+          startedAt: "2026-01-20T13:57:40Z"
+      name: delivery-service
+      ready: true
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      restartCount: 2
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:58:01Z"
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+        recursiveReadOnly: Disabled
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-jphzm
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.37
+    podIPs:
+    - ip: 10.1.0.37
+    qosClass: Burstable
+    startTime: "2026-01-19T15:04:05Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      kubectl.kubernetes.io/restartedAt: "2026-01-19T22:51:59+08:00"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8084"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T14:52:11Z"
+    generateName: delivery-service-5c9dfd4b97-
+    generation: 1
+    labels:
+      app: delivery-service
+      pod-template-hash: 5c9dfd4b97
+    name: delivery-service-5c9dfd4b97-rl259
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: delivery-service-5c9dfd4b97
+      uid: df37f417-6bfe-4223-a479-b1120452c27d
+    resourceVersion: "36787"
+    uid: 82af4630-4da6-4761-98a5-a9ef0d4e8ba9
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: MYSQL_DSN
+        valueFrom:
+          secretKeyRef:
+            key: MYSQL_DSN
+            name: im-secrets
+      - name: REDIS_ADDR
+        valueFrom:
+          configMapKeyRef:
+            key: REDIS_ADDR
+            name: im-config
+      - name: KAFKA_BROKERS
+        valueFrom:
+          configMapKeyRef:
+            key: KAFKA_BROKERS
+            name: im-config
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.podIP
+      - name: ADVERTISE_ADDR
+        value: $(POD_IP)
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/delivery-service:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 10
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: delivery-service
+      ports:
+      - containerPort: 8084
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-57tld
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - configMap:
+        defaultMode: 420
+        name: delivery-config
+      name: config
+    - name: kube-api-access-57tld
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:41Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:52:11Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:08Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:08Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:52:11Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 500m
+        memory: 512Mi
+      containerID: docker://37a0aef6730862dc14c292b5aeff078175e09b04295be71307f9a32ef3c4c3be
+      image: im/delivery-service:latest
+      imageID: docker-pullable://im/delivery-service@sha256:4c9a10f13959433e32f7d87b42b0231438b553d93c3ce24f85aae6f3cde730c7
+      lastState:
+        terminated:
+          containerID: docker://b997481a954bf243a09f9e7a2e9fb1804ae219e1bfbfc390ca8a0b9bd26005e7
+          exitCode: 1
+          finishedAt: "2026-01-20T13:57:40Z"
+          reason: Error
+          startedAt: "2026-01-20T13:57:40Z"
+      name: delivery-service
+      ready: true
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      restartCount: 2
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:57:56Z"
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+        recursiveReadOnly: Disabled
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-57tld
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.43
+    podIPs:
+    - ip: 10.1.0.43
+    qosClass: Burstable
+    startTime: "2026-01-19T14:52:11Z"
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    annotations:
+      cluster-type: single-node
+      environment: docker-desktop
+      kubectl.kubernetes.io/restartedAt: "2026-01-19T22:51:59+08:00"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8084"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-01-19T14:51:59Z"
+    generateName: delivery-service-5c9dfd4b97-
+    generation: 1
+    labels:
+      app: delivery-service
+      pod-template-hash: 5c9dfd4b97
+    name: delivery-service-5c9dfd4b97-zmh2k
+    namespace: im
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ReplicaSet
+      name: delivery-service-5c9dfd4b97
+      uid: df37f417-6bfe-4223-a479-b1120452c27d
+    resourceVersion: "36811"
+    uid: c39078e6-c698-4c4b-b8bc-0c910ca8f33f
+  spec:
+    containers:
+    - env:
+      - name: APP_ENV
+        valueFrom:
+          configMapKeyRef:
+            key: APP_ENV
+            name: im-config
+      - name: MYSQL_DSN
+        valueFrom:
+          secretKeyRef:
+            key: MYSQL_DSN
+            name: im-secrets
+      - name: REDIS_ADDR
+        valueFrom:
+          configMapKeyRef:
+            key: REDIS_ADDR
+            name: im-config
+      - name: KAFKA_BROKERS
+        valueFrom:
+          configMapKeyRef:
+            key: KAFKA_BROKERS
+            name: im-config
+      - name: POD_IP
+        valueFrom:
+          fieldRef:
+            apiVersion: v1
+            fieldPath: status.podIP
+      - name: ADVERTISE_ADDR
+        value: $(POD_IP)
+      envFrom:
+      - configMapRef:
+          name: im-config
+      image: im/delivery-service:latest
+      imagePullPolicy: IfNotPresent
+      lifecycle:
+        preStop:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - sleep 10
+      livenessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 5
+      name: delivery-service
+      ports:
+      - containerPort: 8084
+        name: http
+        protocol: TCP
+      readinessProbe:
+        failureThreshold: 3
+        httpGet:
+          path: /health
+          port: 8084
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 3
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      terminationMessagePath: /dev/termination-log
+      terminationMessagePolicy: File
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-h8x4g
+        readOnly: true
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    nodeName: docker-desktop
+    preemptionPolicy: PreemptLowerPriority
+    priority: 0
+    restartPolicy: Always
+    schedulerName: default-scheduler
+    securityContext: {}
+    serviceAccount: default
+    serviceAccountName: default
+    terminationGracePeriodSeconds: 30
+    tolerations:
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 300
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 300
+    volumes:
+    - configMap:
+        defaultMode: 420
+        name: delivery-config
+      name: config
+    - name: kube-api-access-h8x4g
+      projected:
+        defaultMode: 420
+        sources:
+        - serviceAccountToken:
+            expirationSeconds: 3607
+            path: token
+        - configMap:
+            items:
+            - key: ca.crt
+              path: ca.crt
+            name: kube-root-ca.crt
+        - downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+              path: namespace
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:57:41Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodReadyToStartContainers
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:51:59Z"
+      observedGeneration: 1
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:13Z"
+      observedGeneration: 1
+      status: "True"
+      type: Ready
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-20T13:58:13Z"
+      observedGeneration: 1
+      status: "True"
+      type: ContainersReady
+    - lastProbeTime: null
+      lastTransitionTime: "2026-01-19T14:51:59Z"
+      observedGeneration: 1
+      status: "True"
+      type: PodScheduled
+    containerStatuses:
+    - allocatedResources:
+        cpu: 500m
+        memory: 512Mi
+      containerID: docker://3bed24093e42a332d589f9ed02ce0b5fc57c19fdb8664ac239fb6f037d7fb3f7
+      image: im/delivery-service:latest
+      imageID: docker-pullable://im/delivery-service@sha256:4c9a10f13959433e32f7d87b42b0231438b553d93c3ce24f85aae6f3cde730c7
+      lastState:
+        terminated:
+          containerID: docker://0df9bbcf32d1a60f5f7c81825514dd91472892850edd450780b06b9db915d928
+          exitCode: 1
+          finishedAt: "2026-01-20T13:57:40Z"
+          reason: Error
+          startedAt: "2026-01-20T13:57:40Z"
+      name: delivery-service
+      ready: true
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      restartCount: 2
+      started: true
+      state:
+        running:
+          startedAt: "2026-01-20T13:58:01Z"
+      volumeMounts:
+      - mountPath: /app/configs
+        name: config
+        readOnly: true
+        recursiveReadOnly: Disabled
+      - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+        name: kube-api-access-h8x4g
+        readOnly: true
+        recursiveReadOnly: Disabled
+    hostIP: 192.168.65.3
+    hostIPs:
+    - ip: 192.168.65.3
+    observedGeneration: 1
+    phase: Running
+    podIP: 10.1.0.42
+    podIPs:
+    - ip: 10.1.0.42
+    qosClass: Burstable
+    startTime: "2026-01-19T14:51:59Z"
+kind: List
+metadata:
+  resourceVersion: ""

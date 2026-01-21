@@ -1,0 +1,64 @@
+LAST SEEN   TYPE      REASON                         OBJECT                                         MESSAGE
+58m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/delivery-service-hpa   invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+58m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/api-gateway-hpa        invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+57m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+57m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+6m52s       Normal    Killing                        pod/delivery-service-5c9dfd4b97-hlxft          Stopping container delivery-service
+6m52s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-jfhc2
+6m52s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-7d749bd896 from 0 to 1
+6m52s       Normal    SuccessfulDelete               replicaset/delivery-service-5c9dfd4b97         Deleted pod: delivery-service-5c9dfd4b97-hlxft
+6m52s       Normal    Scheduled                      pod/delivery-service-7d749bd896-jfhc2          Successfully assigned im/delivery-service-7d749bd896-jfhc2 to docker-desktop
+6m52s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-7d749bd896 from 1 to 2
+6m52s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-jxbd7
+6m52s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-5c9dfd4b97 from 4 to 3
+6m52s       Normal    Started                        pod/delivery-service-7d749bd896-jxbd7          Started container delivery-service
+6m52s       Normal    Created                        pod/delivery-service-7d749bd896-jxbd7          Created container: delivery-service
+6m52s       Normal    Pulled                         pod/delivery-service-7d749bd896-jxbd7          Container image "im/delivery-service:latest" already present on machine
+6m52s       Normal    Scheduled                      pod/delivery-service-7d749bd896-jxbd7          Successfully assigned im/delivery-service-7d749bd896-jxbd7 to docker-desktop
+6m52s       Normal    Started                        pod/delivery-service-7d749bd896-jfhc2          Started container delivery-service
+6m52s       Normal    Created                        pod/delivery-service-7d749bd896-jfhc2          Created container: delivery-service
+6m52s       Normal    Pulled                         pod/delivery-service-7d749bd896-jfhc2          Container image "im/delivery-service:latest" already present on machine
+6m40s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-r6b2s
+6m40s       Normal    Scheduled                      pod/delivery-service-7d749bd896-r6b2s          Successfully assigned im/delivery-service-7d749bd896-r6b2s to docker-desktop
+6m40s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-glwxf
+6m40s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-7d749bd896 from 3 to 4
+6m40s       Normal    Scheduled                      pod/delivery-service-7d749bd896-glwxf          Successfully assigned im/delivery-service-7d749bd896-glwxf to docker-desktop
+6m40s       Normal    Pulled                         pod/delivery-service-7d749bd896-glwxf          Container image "im/delivery-service:latest" already present on machine
+6m40s       Normal    Created                        pod/delivery-service-7d749bd896-glwxf          Created container: delivery-service
+6m40s       Normal    Started                        pod/delivery-service-7d749bd896-glwxf          Started container delivery-service
+6m40s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-5c9dfd4b97 from 2 to 1
+6m40s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-7d749bd896 from 2 to 3
+6m40s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-5c9dfd4b97 from 3 to 2
+6m40s       Normal    Started                        pod/delivery-service-7d749bd896-r6b2s          Started container delivery-service
+6m40s       Normal    Killing                        pod/delivery-service-5c9dfd4b97-rl259          Stopping container delivery-service
+6m40s       Normal    Killing                        pod/delivery-service-5c9dfd4b97-zmh2k          Stopping container delivery-service
+6m40s       Normal    SuccessfulDelete               replicaset/delivery-service-5c9dfd4b97         Deleted pod: delivery-service-5c9dfd4b97-rl259
+6m40s       Normal    SuccessfulDelete               replicaset/delivery-service-5c9dfd4b97         Deleted pod: delivery-service-5c9dfd4b97-zmh2k
+6m40s       Normal    Created                        pod/delivery-service-7d749bd896-r6b2s          Created container: delivery-service
+6m40s       Normal    Pulled                         pod/delivery-service-7d749bd896-r6b2s          Container image "im/delivery-service:latest" already present on machine
+6m28s       Normal    SuccessfulDelete               replicaset/delivery-service-5c9dfd4b97         Deleted pod: delivery-service-5c9dfd4b97-9h2tj
+6m28s       Normal    Killing                        pod/delivery-service-5c9dfd4b97-9h2tj          Stopping container delivery-service
+6m28s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-5c9dfd4b97 from 1 to 0
+2m46s       Normal    Pulled                         pod/delivery-service-7d749bd896-zd6p4          Container image "im/delivery-service:latest" already present on machine
+2m46s       Normal    Pulled                         pod/delivery-service-7d749bd896-72tfh          Container image "im/delivery-service:latest" already present on machine
+2m46s       Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-7d749bd896 from 4 to 8
+2m46s       Normal    Scheduled                      pod/delivery-service-7d749bd896-5m8wb          Successfully assigned im/delivery-service-7d749bd896-5m8wb to docker-desktop
+2m46s       Normal    Pulled                         pod/delivery-service-7d749bd896-8zb5n          Container image "im/delivery-service:latest" already present on machine
+2m46s       Normal    Created                        pod/delivery-service-7d749bd896-8zb5n          Created container: delivery-service
+2m46s       Normal    Scheduled                      pod/delivery-service-7d749bd896-zd6p4          Successfully assigned im/delivery-service-7d749bd896-zd6p4 to docker-desktop
+2m46s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-zd6p4
+2m46s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-5m8wb
+2m46s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-72tfh
+2m46s       Normal    SuccessfulCreate               replicaset/delivery-service-7d749bd896         Created pod: delivery-service-7d749bd896-8zb5n
+2m46s       Normal    Scheduled                      pod/delivery-service-7d749bd896-8zb5n          Successfully assigned im/delivery-service-7d749bd896-8zb5n to docker-desktop
+2m46s       Normal    Pulled                         pod/delivery-service-7d749bd896-5m8wb          Container image "im/delivery-service:latest" already present on machine
+2m46s       Normal    Created                        pod/delivery-service-7d749bd896-5m8wb          Created container: delivery-service
+2m46s       Normal    Created                        pod/delivery-service-7d749bd896-72tfh          Created container: delivery-service
+2m46s       Normal    Scheduled                      pod/delivery-service-7d749bd896-72tfh          Successfully assigned im/delivery-service-7d749bd896-72tfh to docker-desktop
+2m46s       Normal    Created                        pod/delivery-service-7d749bd896-zd6p4          Created container: delivery-service
+2m45s       Normal    Started                        pod/delivery-service-7d749bd896-5m8wb          Started container delivery-service
+2m45s       Normal    Started                        pod/delivery-service-7d749bd896-72tfh          Started container delivery-service
+2m45s       Normal    Started                        pod/delivery-service-7d749bd896-8zb5n          Started container delivery-service
+2m45s       Normal    Started                        pod/delivery-service-7d749bd896-zd6p4          Started container delivery-service
+2s          Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+2s          Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)

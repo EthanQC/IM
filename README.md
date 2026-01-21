@@ -246,6 +246,15 @@ type ReliableConsumer struct {
 
 ---
 
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [WebSocket 压力测试指南](docs/websocket-benchmark-guide.md) | 压测工具使用、指标解读、实测数据 |
+| [构建与部署工具说明](docs/build-and-deploy.md) | Makefile 命令、脚本使用、K8s 部署 |
+
+---
+
 ## 快速开始
 ### 本地开发
 #### 克隆项目并安装依赖
@@ -325,6 +334,312 @@ cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 - 查看所有 API 接口
 - 点击 "Try it out" 直接测试
 - 需要认证的接口，先登录获取 token，然后点击 "Authorize" 按钮输入
+
+### 本地 Kubernetes 部署 (Docker Desktop)
+
+本项目支持在 Docker Desktop Kubernetes 单节点集群中部署，适合本地开发测试和性能验证
+
+#### 前置条件
+
+1. **Docker Desktop** 已安装并启用 Kubernetes
+2. **kubectl** 命令行工具可用
+3. 宿主机依赖服务（MySQL/Redis/Kafka/MinIO）已启动
+
+#### 一键部署
+
+```bash
+# 1. 启动宿主机依赖（如果尚未启动）
+make docker-deps-up
+
+# 2. 构建服务镜像
+make build
+
+# 3. 部署到 K8s
+make k8s-up
+
+# 或使用 kubectl 直接部署
+kubectl apply -k deploy/k8s/overlays/docker-desktop
+```
+
+#### 验证部署
+
+```bash
+# 查看 Pod 状态
+make k8s-status
+
+# 或
+kubectl get pods -n im
+
+# 访问服务
+curl http://localhost:30080/healthz      # API Gateway
+curl http://localhost:30084/health       # Delivery Service
+```
+
+#### 访问地址
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| API Gateway | http://localhost:30080 | HTTP API 入口 |
+| Delivery Service | ws://localhost:30084/ws | WebSocket 连接 |
+| API 文档 | http://localhost:30080/swagger | Swagger UI |
+
+#### K8s 目录结构
+
+```
+deploy/k8s/
+├── base/                           # 基础配置
+│   ├── kustomization.yaml
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml
+│   ├── api-gateway.yaml            # API Gateway Deployment/Service
+│   ├── api-gateway-hpa.yaml        # HPA 自动扩缩容
+│   ├── delivery-service.yaml       # Delivery Service Deployment/Service
+│   ├── delivery-service-hpa.yaml   # HPA 自动扩缩容
+│   └── wsbench.yaml                # 压测工具 Deployment
+│
+└── overlays/
+    └── docker-desktop/             # Docker Desktop 环境配置
+        ├── kustomization.yaml
+        ├── nodeport.yaml           # NodePort 服务（宿主机访问）
+        └── patches/                # 环境特定补丁
+            ├── configmap.yaml      # host.docker.internal 配置
+            ├── secret.yaml
+            ├── deployment-gateway.yaml
+            ├── deployment-delivery.yaml
+            └── wsbench.yaml
+```
+
+#### 常用命令
+
+```bash
+# 查看状态
+make k8s-status
+
+# 查看日志
+make k8s-logs APP=delivery-service
+make k8s-logs APP=api-gateway
+
+# 重启服务
+make k8s-restart APP=delivery-service
+
+# 清理资源
+make k8s-down
+```
+
+#### 安装 Metrics Server
+
+`kubectl top` 命令需要 metrics-server 支持：
+
+```bash
+make install-metrics-server
+
+# 验证
+kubectl top nodes
+kubectl top pods -n im
+```
+
+---
+
+### WebSocket 50K 并发压测
+
+本项目提供完整的 WebSocket 压测方案，目标是验证单节点 50,000+ 并发连接。
+
+#### 压测工具
+
+压测工具位于 `bench/wsbench/`，支持两种模式：
+
+| 模式 | 说明 |
+|------|------|
+| `connect-only` | 仅建立连接并保持心跳，测试连接容量 |
+| `messaging` | 在保持连接基础上发送消息，测试消息吞吐 |
+
+#### 快速开始
+
+```bash
+# 1. 确保 K8s 环境已部署
+make k8s-up
+
+# 2. 启动 10K 连接压测（推荐先小规模验证）
+make bench-ws-10k
+
+# 3. 查看压测状态
+make k8s-status
+make k8s-logs APP=wsbench
+
+# 4. 收集数据
+make bench-collect
+
+# 5. 停止压测
+make bench-stop
+```
+
+#### 50K 连接压测
+
+```bash
+# 启动 50K 连接（20 个 Pod × 2500 连接）
+make bench-ws-50k
+
+# 配置说明：
+# - replicas: 20
+# - conns_per_pod: 2500
+# - duration: 10m
+# - ramp: 2m（爬坡时间，逐步建立连接）
+```
+
+#### 本地直接压测
+
+如果不想使用 K8s Pod，可以在本地直接运行：
+
+```bash
+# 安装依赖
+cd bench/wsbench && go mod download
+
+# 运行压测（1000 连接）
+go run . \
+  --target=ws://localhost:30084/ws \
+  --conns=1000 \
+  --duration=2m \
+  --ramp=30s \
+  --output=text
+```
+
+#### 压测参数说明
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--mode` | connect-only | 压测模式：connect-only / messaging |
+| `--target` | - | WebSocket URL |
+| `--conns` | 1000 | 总连接数 |
+| `--duration` | 5m | 压测持续时间 |
+| `--ramp` | 1m | 爬坡时间（逐步建立连接） |
+| `--ping-interval` | 30s | 心跳间隔 |
+| `--msg-rate` | 10 | 每连接每分钟消息数（messaging 模式） |
+| `--output` | text | 输出格式：text / json |
+
+#### 数据收集
+
+```bash
+# 自动收集压测数据
+make bench-collect
+
+# 数据保存到 bench/results/<timestamp>/
+# 包含：
+# - pods.txt          # Pod 状态
+# - top-pods.txt      # 资源使用（需 metrics-server）
+# - hpa.txt           # HPA 状态
+# - logs/             # 各服务日志
+# - metrics/          # Prometheus 指标快照
+# - events.txt        # K8s 事件
+# - summary.txt       # 摘要
+```
+
+#### 压测结果解读
+
+**connect-only 模式输出示例：**
+
+```
+==================== 压测结果 ====================
+
+--- 连接统计 ---
+尝试连接数:     10000
+成功连接数:     9950
+失败连接数:     50
+连接成功率:     99.50%
+断开连接数:     10
+最终连接数:     9940
+
+--- 连接延迟 (ms) ---
+Min:    5.20
+Max:    250.80
+Avg:    45.30
+P50:    35.00
+P95:    120.00
+P99:    180.00
+
+--- 心跳统计 ---
+发送 Ping 数:   99400
+接收 Pong 数:   99350
+Pong 响应率:    99.95%
+
+=================================================
+```
+
+**成功标准：**
+
+| 指标 | 目标值 | 说明 |
+|------|--------|------|
+| 连接成功率 | ≥ 99% | 成功建立的连接比例 |
+| Pong 响应率 | ≥ 99% | 心跳正常响应比例 |
+| 断开连接数 | < 1% | 意外断开的连接 |
+| P99 延迟 | < 500ms | 连接建立延迟 |
+
+#### 结果表格模板
+
+| 指标 | 值 | 备注 |
+|------|-----|------|
+| 目标连接数 | | |
+| 成功连接数 | | |
+| 连接成功率 | | |
+| 断开连接数 | | |
+| P50 连接延迟 | | ms |
+| P95 连接延迟 | | ms |
+| P99 连接延迟 | | ms |
+| Pong 响应率 | | |
+| Delivery Pod CPU | | 来自 kubectl top |
+| Delivery Pod 内存 | | 来自 kubectl top |
+| 节点 CPU | | |
+| 节点内存 | | |
+
+> 注：请从 `bench/results/<timestamp>/` 目录获取真实数据填入
+
+#### 实测结果（Docker Desktop 单节点）
+
+**测试环境：**
+- macOS + Docker Desktop Kubernetes
+- 4~8x delivery-service Pod
+- Kafka 使用 KRaft 模式（无需 Zookeeper）
+
+**10,000 连接测试：**
+
+| 指标 | 值 | 备注 |
+|------|-----|------|
+| 目标连接数 | 10,000 | |
+| 成功连接数 | 10,000 | |
+| 连接成功率 | 100.00% | ✅ 完美 |
+| 断开连接数 | 0 | |
+| P50 连接延迟 | 1.60ms | |
+| P95 连接延迟 | 6.31ms | |
+| P99 连接延迟 | 24.73ms | |
+
+**30,000 连接测试：**
+
+| 指标 | 值 | 备注 |
+|------|-----|------|
+| 目标连接数 | 30,000 | |
+| 成功连接数 | 10,533 | Docker Desktop 网络栈限制 |
+| 连接成功率 | 35.11% | 受限于单机环境 |
+| P50 连接延迟 | 3.14ms | |
+| P99 连接延迟 | 971.31ms | 网络栈过载 |
+
+> 完整 50K 连接需要真实 K8s 集群或 Linux 服务器环境。Docker Desktop 单机环境在 10K+ 连接后存在网络栈限制。
+> 
+> 详细压测说明请参阅 [WebSocket 压力测试指南](docs/websocket-benchmark-guide.md)
+
+
+#### 瓶颈定位
+
+**常见瓶颈及解决方案：**
+
+| 现象 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| 连接成功率低 | 文件描述符限制 | 调整 `ulimit -n` |
+| 连接成功率低 | 端口耗尽 | 调整 `ip_local_port_range` |
+| 高延迟 | CPU 不足 | 增加 Pod 副本或 CPU limit |
+| 断连率高 | 内存不足 | 增加内存 limit |
+| Pong 响应率低 | 服务过载 | 检查 Kafka/Redis 性能 |
+
+---
 
 ### 部署上云
 #### 服务器要求

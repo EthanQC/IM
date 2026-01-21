@@ -5,14 +5,18 @@ RUN apk add --no-cache git ca-certificates
 
 WORKDIR /app
 
-# 复制 go.mod 和 go.sum
-COPY go.mod go.sum ./
+# 复制多模块依赖
+COPY api/ ./api/
+COPY pkg/ ./pkg/
+COPY services/api_gateway/ ./services/api_gateway/
+
+WORKDIR /app/services/api_gateway
+
+# 禁用 go.work 使用模块独立构建
+ENV GOWORK=off
 
 # 下载依赖
-RUN go mod download
-
-# 复制源代码
-COPY . .
+RUN go mod download && go mod tidy
 
 # 构建
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go ./cmd/handlers.go
@@ -24,8 +28,8 @@ RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
-COPY --from=builder /app/main .
-COPY --from=builder /app/configs ./configs
+COPY --from=builder /app/services/api_gateway/main .
+COPY --from=builder /app/services/api_gateway/configs ./configs
 
 EXPOSE 8080
 

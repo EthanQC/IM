@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: im
+  labels:
+    app.kubernetes.io/name: im
+    app.kubernetes.io/part-of: im-system

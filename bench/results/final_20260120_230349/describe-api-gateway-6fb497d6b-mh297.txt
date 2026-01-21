@@ -1,0 +1,68 @@
+Name:             api-gateway-6fb497d6b-mh297
+Namespace:        im
+Priority:         0
+Service Account:  default
+Node:             docker-desktop/192.168.65.3
+Start Time:       Mon, 19 Jan 2026 22:49:41 +0800
+Labels:           app=api-gateway
+                  pod-template-hash=6fb497d6b
+Annotations:      cluster-type: single-node
+                  environment: docker-desktop
+                  prometheus.io/path: /metrics
+                  prometheus.io/port: 8080
+                  prometheus.io/scrape: true
+Status:           Running
+IP:               10.1.0.40
+IPs:
+  IP:           10.1.0.40
+Controlled By:  ReplicaSet/api-gateway-6fb497d6b
+Containers:
+  api-gateway:
+    Container ID:   docker://a7691929ebb184b35cc41c4d7b07baf8be51cd2499ac1b33e543da6dedda9c74
+    Image:          im/api-gateway:latest
+    Image ID:       docker-pullable://im/api-gateway@sha256:3140ecee04378e2975cca83652ae6b4f7cbf861fbd0f0d8aba1c0a18e9874a25
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Tue, 20 Jan 2026 21:57:40 +0800
+    Last State:     Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Mon, 19 Jan 2026 22:49:41 +0800
+      Finished:     Mon, 19 Jan 2026 23:25:01 +0800
+    Ready:          True
+    Restart Count:  1
+    Limits:
+      cpu:     2
+      memory:  1Gi
+    Requests:
+      cpu:      200m
+      memory:   256Mi
+    Liveness:   http-get http://:8080/healthz delay=10s timeout=5s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:8080/healthz delay=5s timeout=3s period=10s #success=1 #failure=3
+    Environment Variables from:
+      im-config  ConfigMap  Optional: false
+    Environment:
+      APP_ENV:     <set to the key 'APP_ENV' of config map 'im-config'>  Optional: false
+      JWT_SECRET:  <set to the key 'JWT_SECRET' in secret 'im-secrets'>  Optional: false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qt5sg (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-qt5sg:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>

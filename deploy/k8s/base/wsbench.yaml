@@ -1,0 +1,78 @@
+# wsbench - WebSocket 压测 Pod
+# 用于分布式 WebSocket 压力测试
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wsbench
+  namespace: im
+  labels:
+    app: wsbench
+    app.kubernetes.io/name: wsbench
+    app.kubernetes.io/component: loadgen
+spec:
+  replicas: 0  # 默认不启动，通过 scale 控制
+  selector:
+    matchLabels:
+      app: wsbench
+  template:
+    metadata:
+      labels:
+        app: wsbench
+    spec:
+      # 允许创建更多连接
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
+      containers:
+        - name: wsbench
+          image: im/wsbench:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--mode=$(BENCH_MODE)"
+            - "--target=$(WS_TARGET)"
+            - "--conns=$(CONNS_PER_POD)"
+            - "--duration=$(DURATION)"
+            - "--ramp=$(RAMP_DURATION)"
+            - "--ping-interval=$(PING_INTERVAL)"
+            - "--output=json"
+          env:
+            - name: BENCH_MODE
+              value: "connect-only"
+            - name: WS_TARGET
+              value: "ws://delivery-service:8084/ws"
+            - name: CONNS_PER_POD
+              value: "2500"
+            - name: DURATION
+              value: "10m"
+            - name: RAMP_DURATION
+              value: "2m"
+            - name: PING_INTERVAL
+              value: "30s"
+            - name: GOMAXPROCS
+              value: "2"
+            # Pod 标识
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          volumeMounts:
+            - name: results
+              mountPath: /results
+      volumes:
+        - name: results
+          emptyDir: {}
+      # 不被 HPA 抢占资源
+      priorityClassName: system-cluster-critical
+      terminationGracePeriodSeconds: 30

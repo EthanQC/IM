@@ -1,0 +1,139 @@
+LAST SEEN   TYPE      REASON                         OBJECT                                         MESSAGE
+23h         Normal    Scheduled                      pod/delivery-service-5c9dfd4b97-hlxft          Successfully assigned im/delivery-service-5c9dfd4b97-hlxft to docker-desktop
+24h         Normal    Scheduled                      pod/api-gateway-6fb497d6b-nhgbn                Successfully assigned im/api-gateway-6fb497d6b-nhgbn to docker-desktop
+24h         Normal    Scheduled                      pod/api-gateway-6fb497d6b-qlzbx                Successfully assigned im/api-gateway-6fb497d6b-qlzbx to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-84ddfd8dc7-xvj6q          Successfully assigned im/delivery-service-84ddfd8dc7-xvj6q to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-5c9dfd4b97-zmh2k          Successfully assigned im/delivery-service-5c9dfd4b97-zmh2k to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-69c54d7cfc-lpczk          Successfully assigned im/delivery-service-69c54d7cfc-lpczk to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-69c9fd7578-4qztf          Successfully assigned im/delivery-service-69c9fd7578-4qztf to docker-desktop
+24h         Normal    Scheduled                      pod/api-gateway-6fb497d6b-mh297                Successfully assigned im/api-gateway-6fb497d6b-mh297 to docker-desktop
+23h         Normal    Scheduled                      pod/delivery-service-5c9dfd4b97-9h2tj          Successfully assigned im/delivery-service-5c9dfd4b97-9h2tj to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-758cc65b8f-fcmj5          Successfully assigned im/delivery-service-758cc65b8f-fcmj5 to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-5c9dfd4b97-rl259          Successfully assigned im/delivery-service-5c9dfd4b97-rl259 to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-758cc65b8f-k722v          Successfully assigned im/delivery-service-758cc65b8f-k722v to docker-desktop
+24h         Normal    Scheduled                      pod/delivery-service-69c9fd7578-9nzzt          Successfully assigned im/delivery-service-69c9fd7578-9nzzt to docker-desktop
+24h         Normal    ScalingReplicaSet              deployment/api-gateway                         Scaled up replica set api-gateway-6fb497d6b from 0 to 1
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-758cc65b8f from 0 to 1
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-758cc65b8f         Created pod: delivery-service-758cc65b8f-k722v
+24h         Normal    SuccessfulCreate               replicaset/api-gateway-6fb497d6b               Created pod: api-gateway-6fb497d6b-qlzbx
+24h         Normal    Pulled                         pod/api-gateway-6fb497d6b-qlzbx                Container image "im/api-gateway:latest" already present on machine
+24h         Normal    Created                        pod/api-gateway-6fb497d6b-qlzbx                Created container: api-gateway
+24h         Normal    Started                        pod/api-gateway-6fb497d6b-qlzbx                Started container api-gateway
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-758cc65b8f         Created pod: delivery-service-758cc65b8f-fcmj5
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-758cc65b8f from 1 to 2
+24h         Normal    SuccessfulCreate               replicaset/api-gateway-6fb497d6b               Created pod: api-gateway-6fb497d6b-nhgbn
+24h         Normal    Created                        pod/api-gateway-6fb497d6b-nhgbn                Created container: api-gateway
+24h         Normal    Pulled                         pod/api-gateway-6fb497d6b-nhgbn                Container image "im/api-gateway:latest" already present on machine
+24h         Normal    Started                        pod/api-gateway-6fb497d6b-nhgbn                Started container api-gateway
+24h         Warning   BackOff                        pod/delivery-service-758cc65b8f-k722v          Back-off restarting failed container delivery-service in pod delivery-service-758cc65b8f-k722v_im(91c0d969-5068-4c94-babc-d3b2a4c12429)
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-84ddfd8dc7 from 0 to 1
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-84ddfd8dc7         Created pod: delivery-service-84ddfd8dc7-xvj6q
+24h         Normal    Created                        pod/delivery-service-758cc65b8f-k722v          Created container: delivery-service
+24h         Normal    Pulled                         pod/delivery-service-758cc65b8f-k722v          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Started                        pod/delivery-service-758cc65b8f-k722v          Started container delivery-service
+24h         Warning   BackOff                        pod/delivery-service-758cc65b8f-fcmj5          Back-off restarting failed container delivery-service in pod delivery-service-758cc65b8f-fcmj5_im(550ad824-414e-4d38-a707-8d80fd727fcd)
+24h         Normal    Started                        pod/delivery-service-758cc65b8f-fcmj5          Started container delivery-service
+24h         Normal    Created                        pod/delivery-service-758cc65b8f-fcmj5          Created container: delivery-service
+24h         Normal    Pulled                         pod/delivery-service-758cc65b8f-fcmj5          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Pulled                         pod/delivery-service-84ddfd8dc7-xvj6q          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Started                        pod/delivery-service-84ddfd8dc7-xvj6q          Started container delivery-service
+24h         Normal    Created                        pod/delivery-service-84ddfd8dc7-xvj6q          Created container: delivery-service
+24h         Warning   BackOff                        pod/delivery-service-84ddfd8dc7-xvj6q          Back-off restarting failed container delivery-service in pod delivery-service-84ddfd8dc7-xvj6q_im(4fc09ecb-6933-4157-a643-0e8c272e6776)
+24h         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/delivery-service-hpa   invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+24h         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/api-gateway-hpa        invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+24h         Normal    ScalingReplicaSet              deployment/api-gateway                         Scaled down replica set api-gateway-6fb497d6b from 2 to 1
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-69c54d7cfc from 0 to 1
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-758cc65b8f from 1 to 0
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-758cc65b8f from 2 to 1
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-69c54d7cfc         Created pod: delivery-service-69c54d7cfc-lpczk
+24h         Normal    SuccessfulDelete               replicaset/api-gateway-6fb497d6b               Deleted pod: api-gateway-6fb497d6b-qlzbx
+24h         Normal    Killing                        pod/api-gateway-6fb497d6b-qlzbx                Stopping container api-gateway
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-758cc65b8f         Deleted pod: delivery-service-758cc65b8f-fcmj5
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-758cc65b8f         Deleted pod: delivery-service-758cc65b8f-k722v
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-84ddfd8dc7         Deleted pod: delivery-service-84ddfd8dc7-xvj6q
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-69c9fd7578         Created pod: delivery-service-69c9fd7578-9nzzt
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-69c9fd7578 from 0 to 1
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled down replica set delivery-service-84ddfd8dc7 from 1 to 0
+24h         Normal    Created                        pod/api-gateway-6fb497d6b-mh297                Created container: api-gateway
+24h         Normal    SuccessfulCreate               replicaset/api-gateway-6fb497d6b               Created pod: api-gateway-6fb497d6b-mh297
+24h         Normal    SuccessfulRescale              horizontalpodautoscaler/delivery-service-hpa   New size: 2; reason: Current number of replicas below Spec.MinReplicas
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-69c9fd7578 from 1 to 2
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-69c9fd7578         Created pod: delivery-service-69c9fd7578-4qztf
+24h         Normal    Pulled                         pod/api-gateway-6fb497d6b-mh297                Container image "im/api-gateway:latest" already present on machine
+24h         Normal    ScalingReplicaSet              deployment/api-gateway                         Scaled up replica set api-gateway-6fb497d6b from 1 to 2
+24h         Normal    SuccessfulRescale              horizontalpodautoscaler/api-gateway-hpa        New size: 2; reason: Current number of replicas below Spec.MinReplicas
+24h         Normal    Started                        pod/api-gateway-6fb497d6b-mh297                Started container api-gateway
+24h         Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+24h         Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+24h         Warning   BackOff                        pod/delivery-service-69c9fd7578-4qztf          Back-off restarting failed container delivery-service in pod delivery-service-69c9fd7578-4qztf_im(65f96226-10e9-4631-b6b2-47ba8ff3190c)
+24h         Normal    Started                        pod/delivery-service-69c9fd7578-4qztf          Started container delivery-service
+24h         Normal    Created                        pod/delivery-service-69c9fd7578-4qztf          Created container: delivery-service
+24h         Normal    Pulled                         pod/delivery-service-69c9fd7578-4qztf          Container image "im/delivery-service:latest" already present on machine
+24h         Warning   BackOff                        pod/delivery-service-69c9fd7578-9nzzt          Back-off restarting failed container delivery-service in pod delivery-service-69c9fd7578-9nzzt_im(9a6d80d6-75e3-4c33-be6b-9897121cbf3b)
+24h         Warning   BackOff                        pod/delivery-service-69c54d7cfc-lpczk          Back-off restarting failed container delivery-service in pod delivery-service-69c54d7cfc-lpczk_im(d3097dad-3235-4cb0-9163-1b0adfd46e81)
+24h         Normal    Created                        pod/delivery-service-69c9fd7578-9nzzt          Created container: delivery-service
+24h         Normal    Started                        pod/delivery-service-69c9fd7578-9nzzt          Started container delivery-service
+24h         Normal    Pulled                         pod/delivery-service-69c9fd7578-9nzzt          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Started                        pod/delivery-service-69c54d7cfc-lpczk          Started container delivery-service
+24h         Normal    Pulled                         pod/delivery-service-69c54d7cfc-lpczk          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Created                        pod/delivery-service-69c54d7cfc-lpczk          Created container: delivery-service
+24h         Normal    Started                        pod/delivery-service-5c9dfd4b97-zmh2k          Started container delivery-service
+24h         Normal    Killing                        pod/delivery-service-69c54d7cfc-lpczk          Stopping container delivery-service
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-69c54d7cfc         Deleted pod: delivery-service-69c54d7cfc-lpczk
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-5c9dfd4b97         Created pod: delivery-service-5c9dfd4b97-zmh2k
+24h         Normal    Created                        pod/delivery-service-5c9dfd4b97-zmh2k          Created container: delivery-service
+24h         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-zmh2k          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Killing                        pod/delivery-service-69c9fd7578-9nzzt          Stopping container delivery-service
+24h         Normal    SuccessfulCreate               replicaset/delivery-service-5c9dfd4b97         Created pod: delivery-service-5c9dfd4b97-rl259
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-69c9fd7578         Deleted pod: delivery-service-69c9fd7578-9nzzt
+24h         Normal    Started                        pod/delivery-service-5c9dfd4b97-rl259          Started container delivery-service
+24h         Normal    Created                        pod/delivery-service-5c9dfd4b97-rl259          Created container: delivery-service
+24h         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-rl259          Container image "im/delivery-service:latest" already present on machine
+24h         Normal    Killing                        pod/delivery-service-69c9fd7578-4qztf          Stopping container delivery-service
+24h         Normal    ScalingReplicaSet              deployment/delivery-service                    (combined from similar events): Scaled down replica set delivery-service-69c9fd7578 from 1 to 0
+24h         Normal    SuccessfulDelete               replicaset/delivery-service-69c9fd7578         Deleted pod: delivery-service-69c9fd7578-4qztf
+23h         Normal    SuccessfulCreate               replicaset/delivery-service-5c9dfd4b97         Created pod: delivery-service-5c9dfd4b97-hlxft
+23h         Normal    SuccessfulCreate               replicaset/delivery-service-5c9dfd4b97         Created pod: delivery-service-5c9dfd4b97-9h2tj
+23h         Normal    ScalingReplicaSet              deployment/delivery-service                    Scaled up replica set delivery-service-5c9dfd4b97 from 2 to 4
+23h         Normal    Created                        pod/delivery-service-5c9dfd4b97-9h2tj          Created container: delivery-service
+23h         Normal    Created                        pod/delivery-service-5c9dfd4b97-hlxft          Created container: delivery-service
+23h         Normal    Started                        pod/delivery-service-5c9dfd4b97-9h2tj          Started container delivery-service
+23h         Normal    Started                        pod/delivery-service-5c9dfd4b97-hlxft          Started container delivery-service
+23h         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-9h2tj          Container image "im/delivery-service:latest" already present on machine
+23h         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-hlxft          Container image "im/delivery-service:latest" already present on machine
+23h         Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+23h         Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+58m         Normal    SandboxChanged                 pod/api-gateway-6fb497d6b-mh297                Pod sandbox changed, it will be killed and re-created.
+58m         Normal    SandboxChanged                 pod/delivery-service-5c9dfd4b97-9h2tj          Pod sandbox changed, it will be killed and re-created.
+58m         Normal    SandboxChanged                 pod/delivery-service-5c9dfd4b97-hlxft          Pod sandbox changed, it will be killed and re-created.
+58m         Normal    SandboxChanged                 pod/delivery-service-5c9dfd4b97-zmh2k          Pod sandbox changed, it will be killed and re-created.
+58m         Normal    SandboxChanged                 pod/delivery-service-5c9dfd4b97-rl259          Pod sandbox changed, it will be killed and re-created.
+58m         Normal    SandboxChanged                 pod/api-gateway-6fb497d6b-nhgbn                Pod sandbox changed, it will be killed and re-created.
+58m         Normal    Created                        pod/api-gateway-6fb497d6b-mh297                Created container: api-gateway
+58m         Normal    Started                        pod/api-gateway-6fb497d6b-nhgbn                Started container api-gateway
+58m         Normal    Pulled                         pod/api-gateway-6fb497d6b-mh297                Container image "im/api-gateway:latest" already present on machine
+58m         Normal    Created                        pod/api-gateway-6fb497d6b-nhgbn                Created container: api-gateway
+58m         Normal    Pulled                         pod/api-gateway-6fb497d6b-nhgbn                Container image "im/api-gateway:latest" already present on machine
+58m         Normal    Started                        pod/api-gateway-6fb497d6b-mh297                Started container api-gateway
+58m         Warning   BackOff                        pod/delivery-service-5c9dfd4b97-hlxft          Back-off restarting failed container delivery-service in pod delivery-service-5c9dfd4b97-hlxft_im(5c168816-be37-439b-91b7-cc535a33555f)
+58m         Warning   BackOff                        pod/delivery-service-5c9dfd4b97-zmh2k          Back-off restarting failed container delivery-service in pod delivery-service-5c9dfd4b97-zmh2k_im(c39078e6-c698-4c4b-b8bc-0c910ca8f33f)
+58m         Warning   BackOff                        pod/delivery-service-5c9dfd4b97-rl259          Back-off restarting failed container delivery-service in pod delivery-service-5c9dfd4b97-rl259_im(82af4630-4da6-4761-98a5-a9ef0d4e8ba9)
+57m         Warning   BackOff                        pod/delivery-service-5c9dfd4b97-9h2tj          Back-off restarting failed container delivery-service in pod delivery-service-5c9dfd4b97-9h2tj_im(ed9037e5-90d6-4ae4-94ce-26c1abaaaeb6)
+57m         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-rl259          Container image "im/delivery-service:latest" already present on machine
+57m         Normal    Created                        pod/delivery-service-5c9dfd4b97-rl259          Created container: delivery-service
+57m         Normal    Started                        pod/delivery-service-5c9dfd4b97-rl259          Started container delivery-service
+57m         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-9h2tj          Container image "im/delivery-service:latest" already present on machine
+57m         Normal    Created                        pod/delivery-service-5c9dfd4b97-9h2tj          Created container: delivery-service
+57m         Normal    Started                        pod/delivery-service-5c9dfd4b97-9h2tj          Started container delivery-service
+57m         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-hlxft          Container image "im/delivery-service:latest" already present on machine
+57m         Normal    Started                        pod/delivery-service-5c9dfd4b97-hlxft          Started container delivery-service
+57m         Normal    Created                        pod/delivery-service-5c9dfd4b97-hlxft          Created container: delivery-service
+57m         Normal    Pulled                         pod/delivery-service-5c9dfd4b97-zmh2k          Container image "im/delivery-service:latest" already present on machine
+57m         Normal    Created                        pod/delivery-service-5c9dfd4b97-zmh2k          Created container: delivery-service
+57m         Normal    Started                        pod/delivery-service-5c9dfd4b97-zmh2k          Started container delivery-service
+50m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/delivery-service-hpa   invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+50m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/api-gateway-hpa        invalid metrics (2 invalid out of 2), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+49m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+49m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get memory utilization: unable to get metrics for resource memory: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+2m5s        Warning   FailedGetResourceMetric        horizontalpodautoscaler/delivery-service-hpa   failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+2m5s        Warning   FailedGetResourceMetric        horizontalpodautoscaler/api-gateway-hpa        failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)

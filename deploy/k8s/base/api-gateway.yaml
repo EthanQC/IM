@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: im
+  labels:
+    app: api-gateway
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api-gateway
+          image: im/api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: im-config
+                  key: APP_ENV
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: im-secrets
+                  key: JWT_SECRET
+            # gRPC 服务地址通过配置文件传入
+          envFrom:
+            - configMapRef:
+                name: im-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: im
+  labels:
+    app: api-gateway
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: api-gateway

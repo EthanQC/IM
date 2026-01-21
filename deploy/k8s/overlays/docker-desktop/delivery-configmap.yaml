@@ -1,0 +1,51 @@
+# delivery-service k8s 配置（使用 host.docker.internal）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: delivery-config
+  namespace: im
+data:
+  config.dev.yaml: |
+    # Delivery Service K8s Configuration
+    server:
+      http_port: 8084
+      mode: release
+      advertise_addr: ""
+
+    mysql:
+      dsn: "root:imdev@tcp(host.docker.internal:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+      max_idle_conns: 10
+      max_open_conns: 100
+
+    redis:
+      addr: "host.docker.internal:6379"
+      password: ""
+      db: 0
+      pool_size: 100
+
+    kafka:
+      brokers:
+        - "host.docker.internal:29092"
+      group_id: "delivery-service-group"
+      topics:
+        message_new: "im.message.new"
+        message_read: "im.message.read"
+        message_revoked: "im.message.revoked"
+        dead_letter: "im.delivery.dead_letter"
+
+    webrtc:
+      stun_servers:
+        - "stun:stun.l.google.com:19302"
+        - "stun:stun1.l.google.com:19302"
+
+    websocket:
+      heartbeat_interval: 30s
+      write_timeout: 10s
+      read_timeout: 60s
+      max_message_size: 65536
+
+    log:
+      service: "delivery-service"
+      level: debug
+      encoding: json
+      stdout: true
