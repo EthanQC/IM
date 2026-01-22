@@ -2,9 +2,15 @@
 
 基于**微服务架构**的生产级即时通讯系统，采用 **DDD（领域驱动设计）+ 六边形架构**，支持 **50k+ 并发 WebSocket 连接**
 
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?style=flat&logo=kubernetes)](https://kubernetes.io)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)](https://www.docker.com)
+[![gRPC](https://img.shields.io/badge/gRPC-Protocol-244c5a?style=flat&logo=grpc)](https://grpc.io)
+[![Kafka](https://img.shields.io/badge/Kafka-KRaft-231F20?style=flat&logo=apachekafka)](https://kafka.apache.org)
+[![Redis](https://img.shields.io/badge/Redis-7.2-DC382D?style=flat&logo=redis)](https://redis.io)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat&logo=mysql&logoColor=white)](https://www.mysql.com)
+[![Vue.js](https://img.shields.io/badge/Vue-3.x-4FC08D?style=flat&logo=vue.js)](https://vuejs.org)
 
 ---
 
@@ -404,7 +410,23 @@ git clone https://github.com/EthanQC/IM.git
 cd IM
 ```
 
-#### 2. 启动依赖服务
+#### 2. 下载 Go 依赖
+
+```bash
+# 使用 Go workspace 模式，一次性下载所有模块依赖
+go work sync
+
+# 或者分别进入各服务目录下载（首次运行可能需要几分钟）
+for svc in api_gateway identity_service conversation_service message_service delivery_service presence_service file_service; do
+  echo ">>> Downloading $svc dependencies..."
+  (cd services/$svc && go mod download)
+done
+
+# 下载压测工具依赖
+cd bench/wsbench && go mod download && cd ../..
+```
+
+#### 3. 启动依赖服务
 
 ```bash
 # 启动 MySQL、Redis、Kafka、MinIO
@@ -424,14 +446,14 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 | MinIO API | 9000 | localhost:9000 | admin / admin123 |
 | MinIO Console | 9001 | http://localhost:9001 | admin / admin123 |
 
-#### 3. 初始化数据库
+#### 4. 初始化数据库
 
 ```bash
 # 连接 MySQL 并执行 schema.sql
 mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
 ```
 
-#### 4. 启动微服务
+#### 5. 启动微服务
 
 每个服务在独立终端启动（或使用 tmux/screen）：
 
@@ -458,7 +480,7 @@ cd services/file_service && go run cmd/main.go
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 ```
 
-#### 5. 验证部署
+#### 6. 验证部署
 
 ```bash
 # 健康检查
@@ -660,13 +682,59 @@ Pong 响应率:    99.53%
 =================================================
 ```
 
-### 数据收集
+### 数据收集与管理
 
 ```bash
 # 自动收集压测数据
 make bench-collect
 
 # 数据保存到 bench/results/<timestamp>/
+```
+
+#### 压测数据可视化
+
+以下是实测性能趋势图（Docker Desktop 单节点 K8s）：
+
+```
+连接成功率 (%)
+100% ┤████████████████████████████████████████  1K (100.00%)
+ 95% ┤████████████████████████████████████░░░░  10K (95.33%)
+ 50% ┤
+ 25% ┤█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  50K (21.07%)
+ 20% ┤███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  30K (17.99%)
+     └─────────────────────────────────────────
+       1K      10K      30K      50K    连接数
+
+P99 延迟 (ms)
+400ms ┤                     █████████████████████  30K (341.49ms)
+ 50ms ┤
+ 30ms ┤                                    █████  50K (28.82ms)
+ 15ms ┤          ███████░░░░░░░░░░░░░░░░░░░░░░░░  10K (11.69ms)
+  8ms ┤█████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1K (7.46ms)
+      └─────────────────────────────────────────
+        1K      10K      30K      50K    连接数
+```
+
+**结论**：Docker Desktop 环境在 **10K 以内**表现稳定，超过后触发网络栈瓶颈。
+
+#### 压测结果管理
+
+| 操作 | 命令 | 说明 |
+|------|------|------|
+| 查看所有结果 | `ls -la bench/results/` | 按时间戳命名 |
+| 查看最新结果 | `cat bench/results/ws_*_$(date +%Y%m%d)*.txt \| tail -50` | 查看当天结果摘要 |
+| 清理旧结果 | `find bench/results -name "*.txt" -mtime +7 -delete` | 删除 7 天前的结果 |
+| 归档结果 | `tar -czf bench/results/archive_$(date +%Y%m%d).tar.gz bench/results/*.txt` | 打包归档 |
+| 对比两次压测 | `diff bench/results/ws_1000_A.txt bench/results/ws_1000_B.txt` | 对比差异 |
+
+#### 结果文件命名规范
+
+```
+bench/results/ws_<连接数>_<日期>_<时间>.txt
+               │         │      │
+               │         │      └─ HHMMSS 格式
+               │         └─ YYYYMMDD 格式
+               └─ 目标连接数
 ```
 
 ---
