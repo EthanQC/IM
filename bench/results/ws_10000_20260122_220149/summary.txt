@@ -1,0 +1,34 @@
+=== WebSocket 连接压测结果 ===
+测试时间: Thu Jan 22 22:08:29 CST 2026
+配置: 10000 连接 = 10 Pod × 1000
+
+--- 测试时长 ---
+开始时间: Thu Jan 22 22:01:55 CST 2026
+结束时间: Thu Jan 22 22:08:28 CST 2026
+总耗时: 393 秒
+
+--- Pod 状态 ---
+NAME                       READY   STATUS    RESTARTS      AGE
+wsbench-5d6799864b-4p9wv   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-8wwp9   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-btwtj   1/1     Running   2 (28s ago)   6m40s
+wsbench-5d6799864b-cwdgp   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-hbzv8   1/1     Running   1 (98s ago)   6m40s
+wsbench-5d6799864b-jbmvl   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-m5gcd   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-p6gwb   1/1     Running   2 (38s ago)   6m40s
+wsbench-5d6799864b-xdhsf   1/1     Running   1 (99s ago)   6m40s
+wsbench-5d6799864b-zmbq7   1/1     Running   1 (98s ago)   6m40s
+
+--- 连接统计 ---
+成功连接数: 0
+失败连接数: 0
+成功率: 0.00%
+
+--- 资源使用峰值 ---
+metrics-server 不可用
+
+--- HPA 状态 ---
+NAME                   REFERENCE                     TARGETS                                     MINPODS   MAXPODS   REPLICAS   AGE
+api-gateway-hpa        Deployment/api-gateway        cpu: <unknown>/70%, memory: <unknown>/80%   2         10        2          2d23h
+delivery-service-hpa   Deployment/delivery-service   cpu: <unknown>/60%, memory: <unknown>/70%   2         20        2          2d23h
