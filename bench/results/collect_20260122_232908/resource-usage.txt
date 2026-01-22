@@ -1,0 +1,22 @@
+=== 节点资源使用 ===
+NAME             CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
+docker-desktop   564m         5%       4552Mi          38%         
+
+=== Pod 资源使用 (所有命名空间) ===
+POD                                 NAME               CPU(cores)   MEMORY(bytes)   
+api-gateway-f677f8cb5-gwr2j         api-gateway        1m           10Mi            
+api-gateway-f677f8cb5-z947z         api-gateway        1m           9Mi             
+delivery-service-7d749bd896-5j8th   delivery-service   2m           212Mi           
+delivery-service-7d749bd896-8vqjj   delivery-service   2m           236Mi           
+
+=== API Gateway 资源 ===
+NAME                          CPU(cores)   MEMORY(bytes)   
+api-gateway-f677f8cb5-gwr2j   1m           10Mi            
+api-gateway-f677f8cb5-z947z   1m           9Mi             
+
+=== Delivery Service 资源 ===
+NAME                                CPU(cores)   MEMORY(bytes)   
+delivery-service-7d749bd896-5j8th   2m           212Mi           
+delivery-service-7d749bd896-8vqjj   2m           236Mi           
+
+=== wsbench 资源 ===

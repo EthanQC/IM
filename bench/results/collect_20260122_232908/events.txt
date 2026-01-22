@@ -1,0 +1,38 @@
+=== 最近事件（按时间排序）===
+LAST SEEN   TYPE     REASON              OBJECT                             MESSAGE
+35m         Normal   Scheduled           pod/api-gateway-f677f8cb5-z947z    Successfully assigned im/api-gateway-f677f8cb5-z947z to docker-desktop
+34m         Normal   Scheduled           pod/api-gateway-f677f8cb5-gwr2j    Successfully assigned im/api-gateway-f677f8cb5-gwr2j to docker-desktop
+58m         Normal   Scheduled           pod/wsbench-c996465d8-n4jrw        Successfully assigned im/wsbench-c996465d8-n4jrw to docker-desktop
+58m         Normal   Scheduled           pod/wsbench-c996465d8-8cxnr        Successfully assigned im/wsbench-c996465d8-8cxnr to docker-desktop
+58m         Normal   ScalingReplicaSet   deployment/wsbench                 Scaled up replica set wsbench-c996465d8 from 0 to 2
+58m         Normal   SuccessfulCreate    replicaset/wsbench-c996465d8       Created pod: wsbench-c996465d8-n4jrw
+58m         Normal   SuccessfulCreate    replicaset/wsbench-c996465d8       Created pod: wsbench-c996465d8-8cxnr
+55m         Normal   Pulled              pod/wsbench-c996465d8-n4jrw        Container image "im/wsbench:latest" already present on machine
+55m         Normal   Started             pod/wsbench-c996465d8-n4jrw        Started container wsbench
+55m         Normal   Created             pod/wsbench-c996465d8-n4jrw        Created container: wsbench
+55m         Normal   Started             pod/wsbench-c996465d8-8cxnr        Started container wsbench
+55m         Normal   Created             pod/wsbench-c996465d8-8cxnr        Created container: wsbench
+55m         Normal   Pulled              pod/wsbench-c996465d8-8cxnr        Container image "im/wsbench:latest" already present on machine
+54m         Normal   SuccessfulDelete    replicaset/wsbench-c996465d8       Deleted pod: wsbench-c996465d8-8cxnr
+54m         Normal   Killing             pod/wsbench-c996465d8-n4jrw        Stopping container wsbench
+54m         Normal   SuccessfulDelete    replicaset/wsbench-c996465d8       Deleted pod: wsbench-c996465d8-n4jrw
+54m         Normal   Killing             pod/wsbench-c996465d8-8cxnr        Stopping container wsbench
+54m         Normal   ScalingReplicaSet   deployment/wsbench                 Scaled down replica set wsbench-c996465d8 from 2 to 0
+35m         Normal   SuccessfulCreate    replicaset/api-gateway-f677f8cb5   Created pod: api-gateway-f677f8cb5-z947z
+35m         Normal   Started             pod/api-gateway-f677f8cb5-z947z    Started container api-gateway
+35m         Normal   Created             pod/api-gateway-f677f8cb5-z947z    Created container: api-gateway
+35m         Normal   Pulled              pod/api-gateway-f677f8cb5-z947z    Container image "im/api-gateway:latest" already present on machine
+35m         Normal   ScalingReplicaSet   deployment/api-gateway             Scaled up replica set api-gateway-f677f8cb5 from 0 to 1
+34m         Normal   SuccessfulDelete    replicaset/api-gateway-6fb497d6b   Deleted pod: api-gateway-6fb497d6b-9g9k7
+34m         Normal   ScalingReplicaSet   deployment/api-gateway             Scaled up replica set api-gateway-f677f8cb5 from 1 to 2
+34m         Normal   SuccessfulCreate    replicaset/api-gateway-f677f8cb5   Created pod: api-gateway-f677f8cb5-gwr2j
+34m         Normal   Killing             pod/api-gateway-6fb497d6b-9g9k7    Stopping container api-gateway
+34m         Normal   ScalingReplicaSet   deployment/api-gateway             Scaled down replica set api-gateway-6fb497d6b from 2 to 1
+34m         Normal   Pulled              pod/api-gateway-f677f8cb5-gwr2j    Container image "im/api-gateway:latest" already present on machine
+34m         Normal   Started             pod/api-gateway-f677f8cb5-gwr2j    Started container api-gateway
+34m         Normal   Created             pod/api-gateway-f677f8cb5-gwr2j    Created container: api-gateway
+34m         Normal   SuccessfulDelete    replicaset/api-gateway-6fb497d6b   Deleted pod: api-gateway-6fb497d6b-dr5x7
+34m         Normal   Killing             pod/api-gateway-6fb497d6b-dr5x7    Stopping container api-gateway
+34m         Normal   ScalingReplicaSet   deployment/api-gateway             Scaled down replica set api-gateway-6fb497d6b from 1 to 0
+
+=== 警告和错误事件 ===

@@ -19,8 +19,8 @@ func (g *Gateway) registerRoutes() {
 	// 健康检查
 	g.router.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 
-	// Swagger UI 文档 - 使用相对于项目根目录的路径
-	g.router.Static("/docs", "../docs")
+	// Swagger UI 文档 - 使用 ./docs（容器中工作目录为 /app）
+	g.router.Static("/docs", "./docs")
 	g.router.GET("/swagger", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "/docs/index.html")
 	})
@@ -91,21 +91,21 @@ func (g *Gateway) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-	// 从claims中提取user_id（存在 jti 字段中）
-	if sub, ok := claims["sub"].(string); ok {
-		userID, err := strconv.ParseUint(sub, 10, 64)
-		if err == nil {
+		// 从claims中提取user_id（存在 jti 字段中）
+		if sub, ok := claims["sub"].(string); ok {
+			userID, err := strconv.ParseUint(sub, 10, 64)
+			if err == nil {
+				c.Set("user_id", userID)
+			}
+		} else if jti, ok := claims["jti"].(string); ok {
+			// 兼容旧 token: jti 里存 user_id
+			var userID uint64
+			fmt.Sscanf(jti, "%d", &userID)
 			c.Set("user_id", userID)
 		}
-	} else if jti, ok := claims["jti"].(string); ok {
-		// 兼容旧 token: jti 里存 user_id
-		var userID uint64
-		fmt.Sscanf(jti, "%d", &userID)
-		c.Set("user_id", userID)
-	}
 
-	c.Next()
-}
+		c.Next()
+	}
 }
 
 // ctxWithUserID 创建带有 user_id metadata 的 gRPC 上下文

@@ -1,0 +1,14 @@
+=== Services ===
+NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+api-gateway                 ClusterIP   10.110.251.9    <none>        8080/TCP         3d    app=api-gateway
+api-gateway-nodeport        NodePort    10.99.28.98     <none>        8080:30080/TCP   3d    app=api-gateway
+delivery-service            ClusterIP   10.99.193.191   <none>        8084/TCP         3d    app=delivery-service
+delivery-service-nodeport   NodePort    10.98.112.173   <none>        8084:30084/TCP   3d    app=delivery-service
+
+=== Endpoints ===
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                        ENDPOINTS                         AGE
+api-gateway                 10.1.0.124:8080,10.1.0.125:8080   3d
+api-gateway-nodeport        10.1.0.124:8080,10.1.0.125:8080   3d
+delivery-service            10.1.0.100:8084,10.1.0.120:8084   3d
+delivery-service-nodeport   10.1.0.100:8084,10.1.0.120:8084   3d

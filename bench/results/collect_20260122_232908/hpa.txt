@@ -1,0 +1,76 @@
+=== HPA 列表 ===
+NAME                   REFERENCE                     TARGETS                        MINPODS   MAXPODS   REPLICAS   AGE
+api-gateway-hpa        Deployment/api-gateway        cpu: 0%/70%, memory: 4%/80%    2         10        2          3d
+delivery-service-hpa   Deployment/delivery-service   cpu: 0%/60%, memory: 43%/70%   2         20        2          3d
+
+=== HPA 详细信息 ===
+
+--- HPA: api-gateway-hpa ---
+Name:                                                     api-gateway-hpa
+Namespace:                                                im
+Labels:                                                   app.kubernetes.io/managed-by=kustomize
+                                                          app.kubernetes.io/part-of=im-system
+Annotations:                                              cluster-type: single-node
+                                                          environment: docker-desktop
+CreationTimestamp:                                        Mon, 19 Jan 2026 22:39:40 +0800
+Reference:                                                Deployment/api-gateway
+Metrics:                                                  ( current / target )
+  resource cpu on pods  (as a percentage of request):     0% (1m) / 70%
+  resource memory on pods  (as a percentage of request):  4% (10556Ki) / 80%
+Min replicas:                                             2
+Max replicas:                                             10
+Behavior:
+  Scale Up:
+    Stabilization Window: 0 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Percent  Value: 100  Period: 15 seconds
+      - Type: Pods     Value: 4    Period: 15 seconds
+  Scale Down:
+    Stabilization Window: 300 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Percent  Value: 10  Period: 60 seconds
+Deployment pods:       2 current / 2 desired
+Conditions:
+  Type            Status  Reason            Message
+  ----            ------  ------            -------
+  AbleToScale     True    ReadyForNewScale  recommended size matches current size
+  ScalingActive   True    ValidMetricFound  the HPA was able to successfully calculate a replica count from memory resource utilization (percentage of request)
+  ScalingLimited  True    TooFewReplicas    the desired replica count is less than the minimum replica count
+Events:           <none>
+
+--- HPA: delivery-service-hpa ---
+Name:                                                     delivery-service-hpa
+Namespace:                                                im
+Labels:                                                   app.kubernetes.io/managed-by=kustomize
+                                                          app.kubernetes.io/part-of=im-system
+Annotations:                                              cluster-type: single-node
+                                                          environment: docker-desktop
+CreationTimestamp:                                        Mon, 19 Jan 2026 22:39:40 +0800
+Reference:                                                Deployment/delivery-service
+Metrics:                                                  ( current / target )
+  resource cpu on pods  (as a percentage of request):     0% (2m) / 60%
+  resource memory on pods  (as a percentage of request):  43% (230016Ki) / 70%
+Min replicas:                                             2
+Max replicas:                                             20
+Behavior:
+  Scale Up:
+    Stabilization Window: 0 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Percent  Value: 100  Period: 15 seconds
+      - Type: Pods     Value: 4    Period: 15 seconds
+  Scale Down:
+    Stabilization Window: 300 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Percent  Value: 10  Period: 60 seconds
+Deployment pods:       2 current / 2 desired
+Conditions:
+  Type            Status  Reason              Message
+  ----            ------  ------              -------
+  AbleToScale     True    ReadyForNewScale    recommended size matches current size
+  ScalingActive   True    ValidMetricFound    the HPA was able to successfully calculate a replica count from memory resource utilization (percentage of request)
+  ScalingLimited  False   DesiredWithinRange  the desired count is within the acceptable range
+Events:           <none>

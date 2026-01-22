@@ -30,6 +30,7 @@ WORKDIR /app
 
 COPY --from=builder /app/services/api_gateway/main .
 COPY --from=builder /app/services/api_gateway/configs ./configs
+COPY --from=builder /app/services/api_gateway/docs ./docs
 
 EXPOSE 8080
 

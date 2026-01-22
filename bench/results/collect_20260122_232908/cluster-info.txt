@@ -1,0 +1,32 @@
+=== Kubernetes 版本 ===
+Client Version: v1.34.1
+Kustomize Version: v5.7.1
+Server Version: v1.34.1
+
+=== 集群信息 ===
+Kubernetes control plane is running at https://127.0.0.1:6443
+CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+=== API 资源 ===
+configmaps
+endpoints
+events
+limitranges
+persistentvolumeclaims
+pods
+podtemplates
+replicationcontrollers
+resourcequotas
+secrets
+serviceaccounts
+services
+controllerrevisions.apps
+daemonsets.apps
+deployments.apps
+replicasets.apps
+statefulsets.apps
+horizontalpodautoscalers.autoscaling
+cronjobs.batch
+jobs.batch

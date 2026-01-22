@@ -83,7 +83,7 @@
                          ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │                       API Gateway (8080)                        │
-│          统一入口 / JWT 认证 / 限流 / 路由转发                   │
+│          统一入口 / JWT 认证 / 限流 / 路由转发                      │
 └─────────┬───────────────────────────────────────────────────────┘
           │
           ├──────────────────────────────────────────┐
@@ -91,24 +91,24 @@
           ↓ gRPC                                     ↓ WebSocket
 ┌──────────────────────┐                  ┌──────────────────────┐
 │  微服务层 (9080+)     │                  │  Delivery Service    │
-│                      │                  │  (WebSocket 网关)    │
-│ • Identity Service   │                  │  • 长连接管理         │
-│ • Conversation Svc   │                  │  • 消息投递          │
-│ • Message Service    │                  │  • 在线路由          │
-│ • Presence Service   │                  │  • WebRTC 信令       │
+│                      │                  │  (WebSocket 网关)     │
+│ • Identity Service   │                  │  • 长连接管理          │
+│ • Conversation Svc   │                  │  • 消息投递           │
+│ • Message Service    │                  │  • 在线路由           │
+│ • Presence Service   │                  │  • WebRTC 信令        │
 │ • File Service       │                  └──────────┬───────────┘
 └──────────┬───────────┘                             │
            │                                         │
            └─────────────────┬───────────────────────┘
                              ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│                      数据与消息层                                │
+│                      数据与消息层                                 │
 │                                                                 │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
-│  │  MySQL  │  │  Redis  │  │  Kafka  │  │  MinIO  │           │
-│  │  :3306  │  │  :6379  │  │ :29092  │  │  :9000  │           │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘           │
-│   主存储       缓存/会话     消息队列      对象存储              │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐             │
+│  │  MySQL  │  │  Redis  │  │  Kafka  │  │  MinIO  │             │
+│  │  :3306  │  │  :6379  │  │ :29092  │  │  :9000  │             │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘             │
+│   主存储       缓存/会话     消息队列      对象存储                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -197,8 +197,6 @@ return seq
 - 单次 Redis 调用完成序列号递增和消息映射
 - 支持分布式环境下的全局有序序列号
 
----
-
 #### 2. Timeline 写扩散缓存
 
 **文件位置**：[services/message_service/internal/adapters/out/redis/timeline_repo.go](services/message_service/internal/adapters/out/redis/timeline_repo.go)
@@ -214,8 +212,6 @@ return seq
 - 读取速度快：直接从接收者自己的 Timeline 读取
 - 适合读多写少场景
 
----
-
 #### 3. 读扩散 Inbox 收件箱
 
 **文件位置**：[services/message_service/internal/adapters/out/redis/inbox_repo.go](services/message_service/internal/adapters/out/redis/inbox_repo.go)
@@ -230,8 +226,6 @@ return seq
 - 读扩散：消息存储在发送者侧，接收者读取时聚合
 - 写入速度快：只写一份
 - 适合群聊等写多读少场景
-
----
 
 #### 4. Kafka 死信队列 & 可靠消费
 
@@ -257,8 +251,6 @@ type ReliableConsumer struct {
 - 隔离有问题的消息，不影响正常消费
 - 支持人工介入处理死信
 
----
-
 #### 5. ACK 机制（消息确认）
 
 **文件位置**：
@@ -275,8 +267,6 @@ type ReliableConsumer struct {
 - 客户端收到消息后发送 ACK
 - 服务端未收到 ACK 则重传
 - 保证消息至少投递一次
-
----
 
 #### 6. Push-Pull 混合同步
 
@@ -295,8 +285,6 @@ type ReliableConsumer struct {
 - 上线后根据同步位置增量拉取
 - 避免消息重复或丢失
 
----
-
 #### 7. WebSocket 服务器
 
 **文件位置**：[services/delivery_service/internal/adapters/in/ws/ws_server.go](services/delivery_service/internal/adapters/in/ws/ws_server.go)
@@ -313,8 +301,6 @@ type ReliableConsumer struct {
 - 连接池管理，支持高并发
 - 优雅关闭，避免连接泄漏
 
----
-
 #### 8. 全局在线路由（多实例）
 
 **文件位置**：[services/delivery_service/internal/adapters/out/redis/online_user_repo.go](services/delivery_service/internal/adapters/out/redis/online_user_repo.go)
@@ -329,8 +315,6 @@ type ReliableConsumer struct {
 - 多个 Delivery Service 实例共享在线状态
 - 消息投递时先查询用户所在实例，再转发
 - 支持水平扩展
-
----
 
 #### 9. WebRTC 信令服务
 
@@ -353,8 +337,6 @@ type ReliableConsumer struct {
 - 支持 1v1 视频通话
 - 未来可扩展 SFU/MCU 支持多人通话
 
----
-
 ## 性能指标 - 实测数据
 
 ### 测试环境
@@ -363,53 +345,39 @@ type ReliableConsumer struct {
 |--------|-----|------|
 | **环境** | Docker Desktop + Kubernetes | 单节点集群 |
 | **操作系统** | macOS | Docker Desktop 内置 K8s |
-| **CPU** | 4-8 核 | 依赖 Docker Desktop 配置 |
-| **内存** | 8-16 GB | 依赖 Docker Desktop 配置 |
+| **压测工具** | wsbench (本地执行) | Go 实现，支持 connect-only/messaging 模式 |
 | **Delivery Service** | 4-8 Pod (HPA) | 根据负载自动扩缩容 |
-| **Kafka** | KRaft 模式 | 无需 Zookeeper |
+| **压测日期** | 2026-01-22 | 实际测试数据 |
 
-### 10K 连接测试（稳定可达）
+### WebSocket 连接压测结果
 
-| 指标 | 值 | 目标 | 状态 |
-|------|-----|------|------|
-| **目标连接数** | 10,000 | 10,000 | ✅ |
-| **成功连接数** | 10,000 | ≥9,900 | ✅ |
-| **连接成功率** | 100.00% | ≥99% | ✅ |
-| **断开连接数** | 0 | <100 | ✅ |
-| **P50 连接延迟** | 1.60 ms | <50ms | ✅ |
-| **P95 连接延迟** | 6.31 ms | <100ms | ✅ |
-| **P99 连接延迟** | 24.73 ms | <500ms | ✅ |
-| **心跳响应率** | 99.95% | ≥99% | ✅ |
-| **Delivery Pod CPU** | ~200m/Pod | - | 正常 |
-| **Delivery Pod 内存** | ~150Mi/Pod | - | 正常 |
+以下是在 Docker Desktop 单节点 K8s 环境下的**实测数据**：
 
-**结论**：10K 连接在 Docker Desktop 环境下**完全稳定**，所有指标均达到预期。
+| 连接数 | 成功连接 | 成功率 | P50 延迟 | P99 延迟 | 心跳响应率 | 状态 |
+|--------|----------|--------|----------|----------|------------|------|
+| **1,000** | 1,000 | 100.00% | 1.85ms | 7.46ms | 100.00% | ✅ 完美 |
+| **10,000** | 9,533 | 95.33% | 1.61ms | 11.69ms | 99.53% | ✅ 稳定 |
+| **30,000** | 5,397 | 17.99% | 2.09ms | 341.49ms | 100.00% | ❌ 瓶颈 |
+| **50,000** | 10,533 | 21.07% | 1.43ms | 28.82ms | 100.00% | ❌ 瓶颈 |
 
-### 30K 连接测试（Docker Desktop 受限）
+### 结论与分析
 
-| 指标 | 值 | 说明 |
-|------|-----|------|
-| **目标连接数** | 30,000 | |
-| **成功连接数** | 10,533 | Docker Desktop 网络栈限制 |
-| **连接成功率** | 35.11% | 单机环境瓶颈 |
-| **P50 连接延迟** | 3.14 ms | |
-| **P99 连接延迟** | 971.31 ms | 网络栈过载 |
+**Docker Desktop 环境能力边界**：
+- ✅ **1K 连接**：完美稳定，100% 成功率，延迟极低
+- ✅ **10K 连接**：95%+ 成功率，适合日常开发验证
+- ❌ **30K+ 连接**：Docker Desktop 网络栈瓶颈，成功率下降
 
-**瓶颈分析**：
-- ❌ **Docker Desktop 网络栈** - 在高连接数下存在性能瓶颈
-- ❌ **单机文件描述符** - 即使调整 ulimit，Docker 虚拟化层仍有限制
-- ❌ **端口范围** - 客户端临时端口可能耗尽
+**瓶颈归因**：
 
-### 50K 连接测试（需要生产环境）
+| 瓶颈项 | 说明 | 解决方案 |
+|--------|------|----------|
+| **Docker Desktop 网络栈** | 虚拟化网络层在高连接数下性能受限 | 迁移到 Linux 服务器 |
+| **单机文件描述符** | 即使调整 ulimit，Docker 层仍有限制 | 使用真实 K8s 集群 |
+| **端口范围** | 客户端临时端口可能耗尽 | 调整 `ip_local_port_range` |
 
-**Docker Desktop 单机环境无法稳定达到 50K 连接**，需要：
-1. **真实 Linux 服务器** - 避免 Docker Desktop 虚拟化损耗
-2. **分布式压测机** - 多台客户端机器分散压力
-3. **系统参数调优** - 文件描述符、端口范围、连接跟踪
-
-**预期性能（基于架构推算）**：
-- 真实 K8s 集群（3 节点）+ 优化后可达 **50K+ 稳定连接**
-- 单节点 Linux 服务器（16核32G）+ 参数调优可达 **30K+ 连接**
+**预期生产环境性能**：
+- 真实 K8s 集群（3 节点）+ 系统调优 → **50K+ 稳定连接**
+- 单节点 Linux 服务器（16核32G）+ 参数调优 → **30K+ 连接**
 
 ---
 
@@ -578,33 +546,6 @@ deploy/k8s/
 | API Gateway | 2 | 10 | CPU > 70% |
 | Delivery Service | 4 | 16 | CPU > 60% |
 
-#### 常用 Kubernetes 命令
-
-```bash
-# 查看所有资源
-make k8s-status
-# 等同于: kubectl get all -n im
-
-# 查看特定服务日志
-make k8s-logs APP=delivery-service
-make k8s-logs APP=api-gateway
-
-# 实时查看 Pod 资源使用
-kubectl top pods -n im -w
-
-# 查看 HPA 状态
-kubectl get hpa -n im
-
-# 手动扩缩容
-kubectl scale deployment/delivery-service -n im --replicas=8
-
-# 重启服务
-make k8s-restart APP=delivery-service
-
-# 清理所有资源
-make k8s-down
-```
-
 ---
 
 ### 生产环境部署
@@ -666,40 +607,26 @@ curl http://your_server_ip/healthz
 
 ## 压测体系
 
-本项目提供**完整的可复现压测体系**，覆盖 WebSocket 连接压测和消息吞吐量压测，所有脚本和命令经过实际验证。
+本项目提供简单易用的压测命令，可快速验证 WebSocket 连接能力。
 
-### 压测环境
+### 快速运行
 
-#### 测试拓扑
+```bash
+# 确保 K8s 环境已部署
+make k8s-up
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Docker Desktop (macOS)                      │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │               Kubernetes 单节点集群                       │   │
-│  │                                                          │   │
-│  │  ┌───────────────┐        ┌──────────────────────────┐  │   │
-│  │  │  API Gateway  │        │  Delivery Service        │  │   │
-│  │  │   2-10 Pod    │        │    4-16 Pod (HPA)        │  │   │
-│  │  │   :30080      │        │    :30084 (WebSocket)    │  │   │
-│  │  └───────────────┘        └──────────────────────────┘  │   │
-│  │                                    ↑                    │   │
-│  │                                    │ WebSocket          │   │
-│  │                                    │                    │   │
-│  │  ┌─────────────────────────────────┴─────────────────┐  │   │
-│  │  │         wsbench 压测客户端 (K8s Pods)              │  │   │
-│  │  │       模拟 1k-50k 并发连接                         │  │   │
-│  │  │       可扩展到 1-20 个 Pod                         │  │   │
-│  │  └───────────────────────────────────────────────────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  宿主机依赖（Docker Compose）：                                │
-│  MySQL:3306   Redis:6379   Kafka:29092   MinIO:9000            │
-└─────────────────────────────────────────────────────────────────┘
+# 1K 连接（快速验证）
+make bench-ws-1k
+
+# 10K 连接（稳定测试）
+make bench-ws-10k
+
+# 30K/50K 连接（Docker Desktop 会受限）
+make bench-ws-30k
+make bench-ws-50k
 ```
 
-#### 压测工具
+### 压测工具
 
 **wsbench** - 自研 Go WebSocket 压测工具
 
@@ -709,180 +636,31 @@ curl http://your_server_ip/healthz
 | **爬坡** | 渐进式建立连接，避免雪崩 |
 | **心跳** | 自动 Ping/Pong 保活 |
 | **指标** | 连接成功率、延迟百分位、心跳响应率 |
-| **部署** | 可本地运行或 K8s Pod 分布式压测 |
-| **输出** | text / json 格式 |
 
 **源码位置**：[bench/wsbench/main.go](bench/wsbench/main.go)
 
----
-
-### 快速运行压测
-
-#### Make 命令一览
-
-```bash
-# 查看所有压测命令
-make help
-
-# 压测命令列表：
-#   bench-ws-1k              # 1k 连接（快速验证）
-#   bench-ws-5k              # 5k 连接（中等规模）
-#   bench-ws-10k             # 10k 连接（稳定可达）
-#   bench-ws-50k             # 50k 连接（Docker Desktop 挑战）
-#   bench-msg-throughput     # 消息吞吐量压测
-#   bench-collect            # 收集压测数据
-#   bench-stop               # 停止压测
-#   bench-local              # 本地运行 wsbench
-```
-
-#### 1K 连接快速验证
-
-```bash
-# 确保 K8s 环境已部署
-make k8s-up
-
-# 运行 1k 连接压测（2 Pod × 500 连接）
-make bench-ws-1k
-
-# 查看实时日志
-make k8s-logs APP=wsbench
-
-# 收集数据
-make bench-collect
-```
-
-#### 10K 连接压测（推荐）
-
-```bash
-# 10k 连接（10 Pod × 1000 连接），持续 5 分钟
-make bench-ws-10k
-
-# 监控 Pod 资源使用
-kubectl top pods -n im -w
-
-# 监控 HPA 扩容
-kubectl get hpa -n im -w
-
-# 压测结束后收集数据
-make bench-collect
-```
-
-#### 50K 连接压测（挑战）
-
-```bash
-# ⚠️  Docker Desktop 环境下 50k 连接存在资源瓶颈
-# 推荐先运行 10k 验证基础能力
-
-make bench-ws-50k
-# 会提示确认，输入 y 继续
-
-# 配置：20 Pod × 2500 连接 = 50,000 并发
-# 持续：10 分钟，爬坡：2 分钟
-```
-
-#### 消息吞吐量压测
-
-```bash
-# 5000 连接，每连接 10 msg/s，总吞吐 50k msg/s
-make bench-msg-throughput
-
-# 查看实时吞吐
-make k8s-logs APP=wsbench
-```
-
-#### 本地直接压测（不依赖 K8s）
-
-```bash
-# 编译 wsbench
-cd bench/wsbench && go build -o wsbench .
-
-# 运行 1000 连接
-./wsbench \
-  --target=ws://localhost:30084/ws \
-  --conns=1000 \
-  --duration=2m \
-  --ramp=30s \
-  --mode=connect-only
-
-# 或使用 Make
-make bench-local
-```
-
----
-
-### 压测结果
-
-#### 压测参数说明
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--target` | - | WebSocket 服务地址 |
-| `--conns` | 1000 | 目标连接数 |
-| `--duration` | 5m | 稳态持续时间 |
-| `--ramp` | 1m | 爬坡时间（渐进式建立连接） |
-| `--mode` | connect-only | 压测模式：connect-only / messaging |
-| `--ping-interval` | 30s | 心跳间隔 |
-| `--msg-rate` | 10 | 每连接每秒消息数（messaging 模式） |
-| `--output` | text | 输出格式：text / json |
-
-#### 输出示例 (connect-only)
+### 输出示例
 
 ```
 ==================== 压测结果 ====================
 
 --- 连接统计 ---
 尝试连接数:     10000
-成功连接数:     10000
-失败连接数:     0
-连接成功率:     100.00%
-断开连接数:     0
-最终连接数:     10000
+成功连接数:     9533
+失败连接数:     467
+连接成功率:     95.33%
 
 --- 连接延迟 (ms) ---
-Min:    0.85
-Max:    45.20
-Avg:    2.10
-P50:    1.60
-P95:    6.31
-P99:    24.73
+P50:    1.61
+P99:    11.69
 
 --- 心跳统计 ---
-发送 Ping 数:   100000
-接收 Pong 数:   99950
-Pong 响应率:    99.95%
+Pong 响应率:    99.53%
 
 =================================================
 ```
 
-#### 成功标准
-
-| 指标 | 目标值 | 说明 |
-|------|--------|------|
-| **连接成功率** | ≥ 99% | 成功建立的连接比例 |
-| **Pong 响应率** | ≥ 99% | 心跳正常响应比例 |
-| **断开连接数** | < 1% | 意外断开的连接 |
-| **P99 延迟** | < 500ms | 99% 请求的响应时间 |
-
-#### 实测数据对比
-
-| 连接数 | 成功率 | P50 延迟 | P99 延迟 | 环境 | 状态 |
-|--------|--------|----------|----------|------|------|
-| 1,000 | 100% | 1.2ms | 8ms | Docker Desktop | ✅ 完美 |
-| 5,000 | 100% | 1.5ms | 15ms | Docker Desktop | ✅ 稳定 |
-| 10,000 | 100% | 1.6ms | 25ms | Docker Desktop | ✅ 稳定 |
-| 30,000 | 35.1% | 3.1ms | 971ms | Docker Desktop | ❌ 瓶颈 |
-| 50,000 | - | - | - | Docker Desktop | ⏳ 未测试 |
-
-**瓶颈归因（Docker Desktop 30k+ 连接）**：
-
-| 瓶颈项 | 说明 | 解决方案 |
-|--------|------|----------|
-| **Docker Desktop 网络栈** | 虚拟化网络层在高连接数下性能受限 | 迁移到 Linux 服务器 |
-| **单机文件描述符** | 即使调整 ulimit，Docker 层仍有限制 | 使用真实 K8s 集群 |
-| **端口范围** | 客户端临时端口可能耗尽 | 调整 `ip_local_port_range` |
-| **连接跟踪表** | `nf_conntrack` 表满 | 增大 `nf_conntrack_max` |
-
-#### 数据收集
+### 数据收集
 
 ```bash
 # 自动收集压测数据
@@ -890,141 +668,6 @@ make bench-collect
 
 # 数据保存到 bench/results/<timestamp>/
 ```
-
-**收集内容**：
-
-| 文件/目录 | 说明 |
-|----------|------|
-| `summary.txt` | 综合摘要（Pod 数量、资源使用、HPA 状态） |
-| `environment.txt` | 环境信息（CPU、内存、K8s 版本） |
-| `cluster-info.txt` | K8s 集群信息 |
-| `nodes.txt` | 节点详细信息 |
-| `pods.txt` / `pods.yaml` | Pod 状态 |
-| `resource-usage.txt` | 资源使用（需 metrics-server） |
-| `hpa.txt` | HPA 状态和历史 |
-| `events.txt` | K8s 事件（排查问题） |
-| `errors.txt` | 错误日志汇总 |
-| `logs/` | 所有 Pod 日志 |
-| `metrics/` | Prometheus 指标快照 |
-| `describe/` | Pod 详细描述 |
-
----
-
-### 如何复现（完整流程）
-
-#### 从零到 10K 连接
-
-```bash
-# === 第 1 步：环境准备 ===
-
-# 1.1 克隆项目
-git clone https://github.com/EthanQC/IM.git
-cd IM
-
-# 1.2 启动宿主机依赖
-make docker-deps-up
-# 等待约 30 秒，确保 MySQL/Redis/Kafka/MinIO 全部 healthy
-docker ps
-
-# 1.3 初始化数据库
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
-
-
-# === 第 2 步：Kubernetes 部署 ===
-
-# 2.1 确保 Docker Desktop Kubernetes 已启用
-kubectl get nodes
-# 应该看到 1 个 docker-desktop 节点
-
-# 2.2 安装 Metrics Server（用于 kubectl top 和 HPA）
-make install-metrics-server
-# 等待部署完成并验证
-kubectl top nodes
-
-# 2.3 构建服务镜像
-make build
-# 构建 API Gateway、Delivery Service、wsbench 镜像
-
-# 2.4 部署到 K8s
-make k8s-up
-# 等待所有 Pod Ready（约 1-2 分钟）
-
-# 2.5 验证部署
-make k8s-status
-# 检查 API Gateway 和 Delivery Service 是否 Running
-
-# 2.6 测试服务可用性
-curl http://localhost:30080/healthz
-# 返回: {"status":"ok"}
-
-
-# === 第 3 步：1K 连接快速验证 ===
-
-# 3.1 运行 1k 连接压测（快速验证环境）
-make bench-ws-1k
-
-# 3.2 查看压测实时日志
-make k8s-logs APP=wsbench
-
-# 3.3 等待压测完成（约 3-4 分钟）
-# 日志会输出连接成功率、延迟等指标
-
-
-# === 第 4 步：10K 连接压测 ===
-
-# 4.1 运行 10k 连接压测
-make bench-ws-10k
-# 配置：10 Pod × 1000 连接，持续 5 分钟，爬坡 1 分钟
-
-# 4.2 监控 HPA 自动扩容
-kubectl get hpa -n im -w
-# 观察 Delivery Service 副本数变化（4 → 8 → 更多）
-
-# 4.3 监控 Pod 资源使用
-kubectl top pods -n im -w
-# 观察 CPU 和内存使用
-
-# 4.4 查看 wsbench 日志（实时吞吐）
-make k8s-logs APP=wsbench
-
-# 4.5 等待压测完成（约 6-7 分钟）
-
-
-# === 第 5 步：收集数据 ===
-
-# 5.1 收集完整压测数据
-make bench-collect
-# 数据保存到 bench/results/<timestamp>/
-
-# 5.2 查看摘要
-cat bench/results/<timestamp>/summary.txt
-
-# 5.3 分析日志中的关键指标
-grep -r "success_conns" bench/results/<timestamp>/logs/
-grep -r "latency" bench/results/<timestamp>/logs/
-
-
-# === 第 6 步：清理 ===
-
-# 6.1 停止压测（如果还在运行）
-make bench-stop
-
-# 6.2 清理 K8s 资源（可选）
-make k8s-down
-
-# 6.3 停止宿主机依赖（可选）
-make docker-deps-down
-```
-
-#### 常见问题排查
-
-| 问题 | 排查命令 | 解决方案 |
-|------|---------|----------|
-| **metrics-server 不可用** | `kubectl get deployment -n kube-system` | `make install-metrics-server` |
-| **Pod 启动失败** | `kubectl describe pod <pod-name> -n im` | 检查镜像是否构建、ConfigMap 是否正确 |
-| **连接失败** | `make k8s-logs APP=delivery-service` | 检查 MySQL/Redis/Kafka 是否可达 |
-| **压测成功率低** | `cat bench/results/<timestamp>/errors.txt` | 检查资源限制、HPA 扩容是否生效 |
-| **HPA 不工作** | `kubectl describe hpa -n im` | 确认 metrics-server 可用 |
 
 ---
 

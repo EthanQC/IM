@@ -1,0 +1,70 @@
+Name:             api-gateway-f677f8cb5-z947z
+Namespace:        im
+Priority:         0
+Service Account:  default
+Node:             docker-desktop/192.168.65.3
+Start Time:       Thu, 22 Jan 2026 22:54:04 +0800
+Labels:           app=api-gateway
+                  pod-template-hash=f677f8cb5
+Annotations:      cluster-type: single-node
+                  environment: docker-desktop
+                  kubectl.kubernetes.io/restartedAt: 2026-01-22T22:54:04+08:00
+                  prometheus.io/path: /metrics
+                  prometheus.io/port: 8080
+                  prometheus.io/scrape: true
+Status:           Running
+IP:               10.1.0.124
+IPs:
+  IP:           10.1.0.124
+Controlled By:  ReplicaSet/api-gateway-f677f8cb5
+Containers:
+  api-gateway:
+    Container ID:   docker://ebd68e89cc611e2d9863a1bd1fdb2d328e1a0c912b0ba3c668b9c794499c330e
+    Image:          im/api-gateway:latest
+    Image ID:       docker-pullable://im/api-gateway@sha256:ebe338b131d8e70fcd1310ad006ba1352df984d591d4b46a36b39f5b63d4091d
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Thu, 22 Jan 2026 22:54:04 +0800
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     2
+      memory:  1Gi
+    Requests:
+      cpu:      200m
+      memory:   256Mi
+    Liveness:   http-get http://:8080/healthz delay=10s timeout=5s period=30s #success=1 #failure=3
+    Readiness:  http-get http://:8080/healthz delay=5s timeout=3s period=10s #success=1 #failure=3
+    Environment Variables from:
+      im-config  ConfigMap  Optional: false
+    Environment:
+      APP_ENV:     <set to the key 'APP_ENV' of config map 'im-config'>  Optional: false
+      JWT_SECRET:  <set to the key 'JWT_SECRET' in secret 'im-secrets'>  Optional: false
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7wjx9 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-7wjx9:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  35m   default-scheduler  Successfully assigned im/api-gateway-f677f8cb5-z947z to docker-desktop
+  Normal  Pulled     35m   kubelet            Container image "im/api-gateway:latest" already present on machine
+  Normal  Created    35m   kubelet            Created container: api-gateway
+  Normal  Started    35m   kubelet            Started container api-gateway

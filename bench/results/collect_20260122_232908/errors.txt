@@ -1,0 +1,21 @@
+=== 日志中的错误（ERROR/FATAL 关键词）===
+
+--- api-gateway-f677f8cb5-gwr2j-previous.log (1 条) ---
+Error from server (BadRequest): previous terminated container "api-gateway" in pod "api-gateway-f677f8cb5-gwr2j" not found
+
+/Users/qingchang/IM/deploy/scripts/collect.sh: line 225: [: 0
+0: integer expression expected
+--- api-gateway-f677f8cb5-z947z-previous.log (1 条) ---
+Error from server (BadRequest): previous terminated container "api-gateway" in pod "api-gateway-f677f8cb5-z947z" not found
+
+/Users/qingchang/IM/deploy/scripts/collect.sh: line 225: [: 0
+0: integer expression expected
+/Users/qingchang/IM/deploy/scripts/collect.sh: line 225: [: 0
+0: integer expression expected
+/Users/qingchang/IM/deploy/scripts/collect.sh: line 225: [: 0
+0: integer expression expected
+--- delivery-service-7d749bd896-8vqjj-previous.log (1 条) ---
+Error from server (BadRequest): previous terminated container "delivery-service" in pod "delivery-service-7d749bd896-8vqjj" not found
+
+/Users/qingchang/IM/deploy/scripts/collect.sh: line 225: [: 0
+0: integer expression expected

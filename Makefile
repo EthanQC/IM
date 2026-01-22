@@ -128,77 +128,44 @@ k8s-restart: ## 重启 K8s 部署 (用法: make k8s-restart APP=delivery-service
 
 # ============== 压测命令 ==============
 
-bench-ws-1k: ## WebSocket 1k 连接压测（快速验证）
-	@echo "$(CYAN)>>> 启动 1k WebSocket 压测（快速验证）$(NC)"
-	@echo "配置: 2 Pod × 500 连接 = 1000 并发"
-	@echo "持续: 3 分钟, 爬坡: 30 秒"
-	@echo ""
+bench-ws-1k: ## WebSocket 1k 连接压测（快速验证，约1分钟）
+	@echo "$(CYAN)>>> 1k WebSocket 连接压测$(NC)"
 	@chmod +x $(BENCH_DIR)/scripts/bench-ws.sh
-	@$(BENCH_DIR)/scripts/bench-ws.sh 1000 2 500 3m 30s
+	@$(BENCH_DIR)/scripts/bench-ws.sh 1000 1m 20s
 
-bench-ws-5k: ## WebSocket 5k 连接压测（中等规模）
-	@echo "$(CYAN)>>> 启动 5k WebSocket 压测$(NC)"
-	@echo "配置: 5 Pod × 1000 连接 = 5000 并发"
-	@echo "持续: 5 分钟, 爬坡: 1 分钟"
-	@echo ""
+bench-ws-5k: ## WebSocket 5k 连接压测（约2分钟）
+	@echo "$(CYAN)>>> 5k WebSocket 连接压测$(NC)"
 	@chmod +x $(BENCH_DIR)/scripts/bench-ws.sh
-	@$(BENCH_DIR)/scripts/bench-ws.sh 5000 5 1000 5m 1m
+	@$(BENCH_DIR)/scripts/bench-ws.sh 5000 2m 30s
 
-bench-ws-10k: ## WebSocket 10k 连接压测（稳定可达）
-	@echo "$(CYAN)>>> 启动 10k WebSocket 压测$(NC)"
-	@echo "配置: 10 Pod × 1000 连接 = 10000 并发"
-	@echo "持续: 5 分钟, 爬坡: 1 分钟"
-	@echo ""
+bench-ws-10k: ## WebSocket 10k 连接压测（约3分钟）
+	@echo "$(CYAN)>>> 10k WebSocket 连接压测$(NC)"
 	@chmod +x $(BENCH_DIR)/scripts/bench-ws.sh
-	@$(BENCH_DIR)/scripts/bench-ws.sh 10000 10 1000 5m 1m
+	@$(BENCH_DIR)/scripts/bench-ws.sh 10000 2m 40s
 
-bench-ws-50k: ## WebSocket 50k 连接压测（Docker Desktop 挑战）
-	@echo "$(CYAN)>>> 启动 50k WebSocket 压测$(NC)"
-	@echo "$(YELLOW)警告: Docker Desktop 单机环境下 50k 连接存在资源瓶颈$(NC)"
-	@echo "配置: 20 Pod × 2500 连接 = 50000 并发"
-	@echo "持续: 10 分钟, 爬坡: 2 分钟"
-	@echo ""
-	@echo "推荐先运行 bench-ws-10k 验证基础能力"
-	@read -p "是否继续? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	@echo ""
+bench-ws-30k: ## WebSocket 30k 连接压测（约4分钟）
+	@echo "$(CYAN)>>> 30k WebSocket 连接压测$(NC)"
 	@chmod +x $(BENCH_DIR)/scripts/bench-ws.sh
-	@$(BENCH_DIR)/scripts/bench-ws.sh 50000 20 2500 10m 2m
+	@$(BENCH_DIR)/scripts/bench-ws.sh 30000 3m 1m
 
-bench-msg-throughput: ## 消息吞吐量压测（固定连接数，压消息）
-	@echo "$(CYAN)>>> 启动消息吞吐量压测$(NC)"
-	@echo "配置: 5000 连接, 每连接 10 msg/s"
-	@echo "持续: 5 分钟, 爬坡: 1 分钟"
-	@echo ""
-	@chmod +x $(BENCH_DIR)/scripts/bench-msg.sh
-	@$(BENCH_DIR)/scripts/bench-msg.sh 5000 10 5m 1m
+bench-ws-50k: ## WebSocket 50k 连接压测（约5分钟）
+	@echo "$(CYAN)>>> 50k WebSocket 连接压测$(NC)"
+	@echo "$(YELLOW)注意: Docker Desktop 环境下可能受限$(NC)"
+	@chmod +x $(BENCH_DIR)/scripts/bench-ws.sh
+	@$(BENCH_DIR)/scripts/bench-ws.sh 50000 3m 2m
 
-bench-collect: ## 收集压测数据（环境信息+指标+日志+HPA）
+bench-collect: ## 收集 K8s 压测环境数据
 	@echo "$(CYAN)>>> 收集压测数据...$(NC)"
 	@mkdir -p $(RESULTS_DIR)
 	@chmod +x $(DEPLOY_DIR)/scripts/collect.sh
 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S) && \
-		echo "结果目录: $(RESULTS_DIR)/$$TIMESTAMP" && \
-		$(DEPLOY_DIR)/scripts/collect.sh $(NAMESPACE) $(RESULTS_DIR)/$$TIMESTAMP && \
-		echo "" && \
-		echo "$(GREEN)>>> 数据收集完成: $(RESULTS_DIR)/$$TIMESTAMP$(NC)"
+		$(DEPLOY_DIR)/scripts/collect.sh $(NAMESPACE) $(RESULTS_DIR)/collect_$$TIMESTAMP && \
+		echo "$(GREEN)>>> 数据收集完成$(NC)"
 
-bench-stop: ## 停止所有压测
-	@echo "$(YELLOW)>>> 停止压测...$(NC)"
+bench-stop: ## 停止 K8s 中的 wsbench Pod
+	@echo "$(YELLOW)>>> 停止 wsbench...$(NC)"
 	kubectl scale deployment/wsbench -n $(NAMESPACE) --replicas=0 2>/dev/null || true
-	@echo "$(GREEN)>>> 压测已停止$(NC)"
-
-bench-local: ## 本地运行压测（直接连接 NodePort，不依赖 K8s wsbench Pod）
-	@echo "$(CYAN)>>> 本地运行 wsbench（1000 连接）$(NC)"
-	@if [ ! -f "$(BENCH_DIR)/wsbench/wsbench" ]; then \
-		echo "$(YELLOW)>>> wsbench 未编译，开始编译...$(NC)"; \
-		cd $(BENCH_DIR)/wsbench && go build -o wsbench .; \
-	fi
-	cd $(BENCH_DIR)/wsbench && ./wsbench \
-		--target=ws://localhost:30084/ws \
-		--conns=1000 \
-		--duration=2m \
-		--ramp=30s \
-		--mode=connect-only
+	@echo "$(GREEN)>>> 已停止$(NC)"
 
 # ============== 依赖管理 ==============
 
