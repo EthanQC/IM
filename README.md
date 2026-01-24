@@ -926,7 +926,99 @@ ps aux | grep "go run"                          # 查看所有 Go 进程
 ---
 
 ## 常见问题
-#### Q: 端口被占用怎么办？
+
+### Q: WSL2 + Docker Desktop 环境 Pod 无法启动？
+
+**症状**：`make k8s-up` 卡在 "Waiting for pod to be ready"，超时提示 `time out waiting for the condition on pods/delivery-service-xxx`
+
+**原因**：WSL2 环境下 `host.docker.internal` 可能无法正确解析，导致 Pod 无法连接宿主机的 MySQL/Redis/Kafka
+
+**排查步骤**：
+
+```bash
+# 1. 检查 Pod 状态
+kubectl get pods -n im -o wide
+
+# 2. 查看 Pod 详细信息（重点看 Events 部分）
+kubectl describe pod -n im -l app=delivery-service
+
+# 3. 查看 Pod 日志（查找连接错误）
+kubectl logs -n im -l app=delivery-service --tail=100
+
+# 4. 验证依赖服务是否运行
+docker ps | grep -E "im_mysql|im_redis|im_kafka"
+
+# 5. 测试 Pod 内部网络连通性
+kubectl run -it --rm debug --image=busybox --restart=Never -n im -- sh
+# 在 Pod 内执行：
+ping host.docker.internal
+nslookup host.docker.internal
+```
+
+**解决方案 1：使用 WSL2 宿主机 IP**
+
+```bash
+# 1. 获取 WSL2 宿主机 IP（在 WSL2 内执行）
+WSL_HOST_IP=$(ip route | grep default | awk '{print $3}')
+echo $WSL_HOST_IP  # 例如：172.18.0.1
+
+# 2. 修改 K8s ConfigMap，替换 host.docker.internal
+kubectl edit configmap im-config -n im
+# 将所有 host.docker.internal 替换为上面的 IP（例如 172.18.0.1）
+
+# 3. 重启 Pod 使配置生效
+kubectl rollout restart deployment/delivery-service -n im
+kubectl rollout restart deployment/api-gateway -n im
+```
+
+**解决方案 2：使用 K8s NodePort 直接连接**
+
+如果 WSL2 环境问题复杂，可以将 MySQL/Redis/Kafka 也部署到 K8s 内（不推荐用于开发）
+
+**解决方案 3：修改 /etc/hosts（临时方案）**
+
+```bash
+# 在 WSL2 内执行
+echo "$(ip route | grep default | awk '{print $3}') host.docker.internal" | sudo tee -a /etc/hosts
+
+# 验证
+ping host.docker.internal
+```
+
+**解决方案 4：调整 Docker Desktop 资源**
+
+WSL2 + Docker Desktop 可能需要手动分配资源：
+
+1. 创建/编辑 `~/.wslconfig`（Windows 用户目录下）：
+
+```ini
+[wsl2]
+memory=16GB
+processors=8
+swap=8GB
+localhostForwarding=true
+```
+
+2. 重启 WSL2：
+```powershell
+# 在 Windows PowerShell 中执行
+wsl --shutdown
+wsl
+```
+
+**验证修复**：
+
+```bash
+# Pod 应该变为 Running 状态
+kubectl get pods -n im
+
+# 测试 API Gateway 可访问
+curl http://localhost:30080/healthz
+```
+
+---
+
+### Q: 端口被占用怎么办？
 
 ```bash
 # 查看占用端口的进程
@@ -936,14 +1028,14 @@ lsof -i :8080
 kill -9 <PID>
 ```
 
-#### Q: MySQL 连接失败？
+### Q: MySQL 连接失败？
 
 等待 MySQL 完全启动（约 30 秒）：
 ```bash
 docker logs im_mysql  # 查看日志
 ```
 
-#### Q: Swagger 页面打不开？
+### Q: Swagger 页面打不开？
 
 确保是从 `services/api_gateway/cmd` 目录启动的：
 ```bash
