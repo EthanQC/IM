@@ -449,8 +449,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 #### 4. 初始化数据库
 
 ```bash
-# 连接 MySQL 并执行 schema.sql
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+# 连接 MySQL 容器并执行 schema.sql
+docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 ```
 
 #### 5. 启动微服务
