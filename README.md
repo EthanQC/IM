@@ -1,6 +1,6 @@
 # Instant Messaging System
 
-基于**微服务架构**的生产级即时通讯系统，采用 **DDD（领域驱动设计）+ 六边形架构**，支持 **50k+ 并发 WebSocket 连接**
+基于**微服务架构**的生产级即时通讯系统，采用 **DDD（领域驱动设计）+ 六边形架构**，支持 **10k+ 并发 WebSocket 连接**
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://golang.org)
@@ -64,7 +64,7 @@
 
 | 分类 | 技术选型 | 版本/说明 |
 |------|---------|----------|
-| **编程语言** | Go | 1.25.5 |
+| **编程语言** | Go | 1.25 |
 | **Web 框架** | Gin | HTTP/WebSocket 服务器 |
 | **ORM** | GORM | MySQL 对象映射 |
 | **服务间通信 (同步)** | gRPC + Protobuf | 高性能 RPC |
@@ -393,7 +393,7 @@ type ReliableConsumer struct {
 
 | 软件 | 版本要求 | 验证命令 |
 |------|---------|----------|
-| Go | 1.21+ | `go version` |
+| Go | 1.25 | `go version` |
 | Docker | 最新版 | `docker --version` |
 | Docker Compose | v2.0+ | `docker compose version` |
 | kubectl (可选) | 最新版 | `kubectl version` |
