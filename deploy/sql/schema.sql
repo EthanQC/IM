@@ -1,6 +1,9 @@
 -- IM System Database Schema
 -- 基于微服务DDD架构设计
 
+CREATE DATABASE IF NOT EXISTS im_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE im_db;
+
 -- ============================================
 -- 用户域 (Identity Service)
 -- ============================================

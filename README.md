@@ -65,7 +65,7 @@
 
 | 分类 | 技术选型 | 版本/说明 |
 |------|---------|----------|
-| **编程语言** | Go | 1.25.5 |
+| **编程语言** | Go | 1.25 |
 | **Web 框架** | Gin | HTTP/WebSocket 服务器 |
 | **ORM** | GORM | MySQL 对象映射 |
 | **服务间通信 (同步)** | gRPC + Protobuf | 高性能 RPC |
@@ -352,7 +352,7 @@ type ReliableConsumer struct {
 
 | 软件 | 版本要求 | 验证命令 |
 |------|---------|----------|
-| Go | 1.21+ | `go version` |
+| Go | 1.25 | `go version` |
 | Docker | 最新版 | `docker --version` |
 | Docker Compose | v2.0+ | `docker compose version` |
 | kubectl (可选) | 最新版 | `kubectl version` |
@@ -408,8 +408,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 #### 4. 初始化数据库
 
 ```bash
-# 连接 MySQL 并执行 schema.sql
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+# 连接 MySQL 容器并执行 schema.sql
+docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 ```
 
 #### 5. 启动微服务
