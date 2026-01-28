@@ -1,2 +1,0 @@
-wget: server returned error: HTTP/1.1 404 Not Found
-command terminated with exit code 1

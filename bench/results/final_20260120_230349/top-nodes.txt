@@ -1,1 +1,0 @@
-metrics-server 未安装，跳过资源使用收集

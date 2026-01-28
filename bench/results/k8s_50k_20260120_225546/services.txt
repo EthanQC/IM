@@ -1,5 +1,0 @@
-NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE   SELECTOR
-api-gateway                 ClusterIP   10.110.251.9    <none>        8080/TCP         24h   app=api-gateway
-api-gateway-nodeport        NodePort    10.99.28.98     <none>        8080:30080/TCP   24h   app=api-gateway
-delivery-service            ClusterIP   10.99.193.191   <none>        8084/TCP         24h   app=delivery-service
-delivery-service-nodeport   NodePort    10.98.112.173   <none>        8084:30084/TCP   24h   app=delivery-service

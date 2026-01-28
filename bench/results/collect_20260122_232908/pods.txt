@@ -1,5 +1,0 @@
-NAME                                READY   STATUS    RESTARTS      AGE   IP           NODE             NOMINATED NODE   READINESS GATES
-api-gateway-f677f8cb5-gwr2j         1/1     Running   0             34m   10.1.0.125   docker-desktop   <none>           <none>
-api-gateway-f677f8cb5-z947z         1/1     Running   0             35m   10.1.0.124   docker-desktop   <none>           <none>
-delivery-service-7d749bd896-5j8th   1/1     Running   1 (23h ago)   25h   10.1.0.100   docker-desktop   <none>           <none>
-delivery-service-7d749bd896-8vqjj   1/1     Running   0             66m   10.1.0.120   docker-desktop   <none>           <none>

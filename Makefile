@@ -1,9 +1,10 @@
 # IM 项目 Makefile
-# 支持 K8s 部署、压测、数据收集
+# 支持本地开发、K8s 部署、高并发压测
 
 .PHONY: help build build-gateway build-delivery build-wsbench \
         k8s-up k8s-down k8s-status k8s-logs k8s-restart \
-        bench-ws-1k bench-ws-5k bench-ws-10k bench-ws-50k bench-msg-throughput bench-collect bench-stop bench-local \
+        bench-ws-1k bench-ws-5k bench-ws-10k bench-ws-30k bench-ws-50k \
+        bench-local bench-remote bench-msg-throughput bench-collect bench-stop \
         docker-deps-up docker-deps-down docker-deps-status \
         install-metrics-server verify-metrics clean
 
@@ -47,11 +48,11 @@ help: ## 显示帮助信息
 	@echo ""
 	@echo "$(YELLOW)快速开始:$(NC)"
 	@echo "  1. make docker-deps-up         # 启动依赖服务"
-	@echo "  2. make install-metrics-server # 安装监控"
-	@echo "  3. make build                  # 构建镜像"
-	@echo "  4. make k8s-up                 # 部署到 K8s"
-	@echo "  5. make bench-ws-10k           # 运行 10k 压测"
-	@echo "  6. make bench-collect          # 收集测试数据"
+	@echo "  2. 启动微服务 (见 README)"
+	@echo "  3. make bench-local CONN=1000  # 本地压测"
+	@echo ""
+	@echo "$(YELLOW)多机压测:$(NC)"
+	@echo "  make bench-remote URL=ws://192.168.1.100:8084/ws CONN=50000"
 
 
 # ============== 构建命令 ==============
@@ -229,3 +230,64 @@ full-bench: bench-ws-10k ## 完整压测流程（10k 连接）
 	@sleep 270
 	@$(MAKE) bench-collect
 	@$(MAKE) bench-stop
+
+# ============== 本地压测命令 ==============
+
+bench-local: ## 本地压测（直接连接本机服务）
+	@echo "$(CYAN)>>> 本地 WebSocket 压测$(NC)"
+	@CONN=$${CONN:-1000}; \
+	DURATION=$${DURATION:-1m}; \
+	URL=$${URL:-ws://localhost:8084/ws}; \
+	echo "目标: $$URL"; \
+	echo "连接数: $$CONN"; \
+	echo "持续时间: $$DURATION"; \
+	cd $(BENCH_DIR)/wsbench && go build -o wsbench . && \
+	./wsbench -url=$$URL -c=$$CONN -d=$$DURATION -r=10s
+
+bench-remote: ## 远程压测（连接其他机器）用法: make bench-remote URL=ws://192.168.1.100:8084/ws CONN=50000
+	@echo "$(CYAN)>>> 远程 WebSocket 压测$(NC)"
+	@if [ -z "$(URL)" ]; then \
+		echo "$(RED)用法: make bench-remote URL=ws://服务器IP:8084/ws CONN=50000$(NC)"; \
+		exit 1; \
+	fi
+	@CONN=$${CONN:-10000}; \
+	DURATION=$${DURATION:-5m}; \
+	RAMP=$${RAMP:-1m}; \
+	echo "目标: $(URL)"; \
+	echo "连接数: $$CONN"; \
+	echo "持续时间: $$DURATION"; \
+	echo "爬坡时间: $$RAMP"; \
+	echo ""; \
+	cd $(BENCH_DIR)/wsbench && go build -o wsbench . && \
+	./wsbench -url=$(URL) -c=$$CONN -d=$$DURATION -r=$$RAMP \
+		-o=$(RESULTS_DIR)/remote_$${CONN}_$$(date +%Y%m%d_%H%M%S).txt; \
+	echo "$(GREEN)>>> 压测完成，结果已保存$(NC)"
+
+bench-msg-throughput: ## 消息吞吐量压测（每连接 10 msg/s）
+	@echo "$(CYAN)>>> 消息吞吐量压测$(NC)"
+	@CONN=$${CONN:-1000}; \
+	URL=$${URL:-ws://localhost:8084/ws}; \
+	echo "目标: $$URL"; \
+	echo "连接数: $$CONN"; \
+	echo "消息速率: 10 msg/s/conn"; \
+	cd $(BENCH_DIR)/wsbench && go build -o wsbench . && \
+	./wsbench -url=$$URL -c=$$CONN -d=2m -r=20s -msg-rate=10
+
+bench-pprof: ## 查看 pprof 分析端点
+	@echo "$(CYAN)>>> pprof 分析端点$(NC)"
+	@echo ""
+	@echo "$(GREEN)本地服务:$(NC)"
+	@echo "  go tool pprof http://localhost:8084/debug/pprof/heap"
+	@echo "  go tool pprof http://localhost:8084/debug/pprof/goroutine"
+	@echo "  go tool pprof http://localhost:8084/debug/pprof/profile?seconds=30"
+	@echo ""
+	@echo "$(GREEN)远程服务 (替换 IP):$(NC)"
+	@echo "  go tool pprof http://192.168.1.100:8084/debug/pprof/heap"
+	@echo ""
+	@echo "$(GREEN)Web UI:$(NC)"
+	@echo "  go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap"
+
+bench-metrics: ## 查看 Prometheus 指标
+	@echo "$(CYAN)>>> Prometheus 指标$(NC)"
+	@URL=$${URL:-http://localhost:8084/metrics}; \
+	curl -s $$URL | grep -E "^(ws_|msg_|http_)" | head -30 || echo "$(RED)无法访问 $$URL$(NC)"

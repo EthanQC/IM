@@ -163,9 +163,12 @@ func main() {
 	result := generateResult(cfg, stats)
 
 	// 输出结果
-	if cfg.Output == "json" {
+	switch cfg.Output {
+	case "json":
 		outputJSON(result)
-	} else {
+	case "csv":
+		outputCSV(result)
+	default:
 		outputText(result)
 	}
 }
@@ -184,7 +187,7 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.AuthMode, "auth-mode", "none", "认证模式: none, token, user-file")
 	flag.StringVar(&cfg.TokenFile, "token-file", "", "Token 文件路径")
 	flag.StringVar(&cfg.UserFile, "user-file", "", "用户文件路径")
-	flag.StringVar(&cfg.Output, "output", "text", "输出格式: text, json")
+	flag.StringVar(&cfg.Output, "output", "text", "输出格式: text, json, csv")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "详细输出")
 
 	flag.Parse()
@@ -660,4 +663,47 @@ func outputText(result Result) {
 	fmt.Printf("--- 运行时间: %.2f 秒 ---\n", result.ActualTime)
 	fmt.Println()
 	fmt.Println("=================================================")
+}
+
+func outputCSV(result Result) {
+	// CSV Header
+	fmt.Println("metric,value")
+
+	// 基础信息
+	fmt.Printf("mode,%s\n", result.Config.Mode)
+	fmt.Printf("target,%s\n", result.Config.Target)
+	fmt.Printf("target_conns,%d\n", result.Config.Conns)
+	fmt.Printf("duration_seconds,%.2f\n", result.ActualTime)
+
+	// 连接统计
+	fmt.Printf("total_attempts,%d\n", result.TotalAttempts)
+	fmt.Printf("success_conns,%d\n", result.SuccessConns)
+	fmt.Printf("failed_conns,%d\n", result.FailedConns)
+	fmt.Printf("success_rate_percent,%.2f\n", result.SuccessRate)
+	fmt.Printf("disconnects,%d\n", result.Disconnects)
+	fmt.Printf("final_conns,%d\n", result.FinalConns)
+
+	// 连接延迟
+	fmt.Printf("conn_latency_min_ms,%.2f\n", result.ConnLatency.Min)
+	fmt.Printf("conn_latency_max_ms,%.2f\n", result.ConnLatency.Max)
+	fmt.Printf("conn_latency_avg_ms,%.2f\n", result.ConnLatency.Avg)
+	fmt.Printf("conn_latency_p50_ms,%.2f\n", result.ConnLatency.P50)
+	fmt.Printf("conn_latency_p90_ms,%.2f\n", result.ConnLatency.P90)
+	fmt.Printf("conn_latency_p95_ms,%.2f\n", result.ConnLatency.P95)
+	fmt.Printf("conn_latency_p99_ms,%.2f\n", result.ConnLatency.P99)
+	fmt.Printf("conn_latency_stddev_ms,%.2f\n", result.ConnLatency.StdDev)
+
+	// 消息统计
+	if result.Config.Mode == "messaging" {
+		fmt.Printf("messages_sent,%d\n", result.MessagesSent)
+		fmt.Printf("messages_received,%d\n", result.MessagesReceived)
+		fmt.Printf("msg_latency_p50_ms,%.2f\n", result.MsgLatency.P50)
+		fmt.Printf("msg_latency_p95_ms,%.2f\n", result.MsgLatency.P95)
+		fmt.Printf("msg_latency_p99_ms,%.2f\n", result.MsgLatency.P99)
+	}
+
+	// 心跳统计
+	fmt.Printf("pings_sent,%d\n", result.PingsSent)
+	fmt.Printf("pongs_received,%d\n", result.PongsReceived)
+	fmt.Printf("pong_rate_percent,%.2f\n", result.PongRate)
 }

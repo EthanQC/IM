@@ -1,7 +1,0 @@
-=== 数据收集信息 ===
-收集时间: Thu Jan 22 23:29:10 CST 2026
-命名空间: im
-收集脚本: /Users/qingchang/IM/deploy/scripts/collect.sh
-执行用户: qingchang
-主机名: qingchangdeMac-mini.local
-

@@ -96,6 +96,15 @@ dump.rdb
 *.db
 *.sqlite
 
+# 编译产物
+bench/wsbench/wsbench
+**/bin/
+**/dist/
 
+# 压测结果（本地产生，不提交）
+bench/results/*
+!bench/results/.gitkeep
+
+# Go 缓存
 .gocache/
 .gomodcache/
