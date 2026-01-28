@@ -163,9 +163,17 @@ make docker-deps-up
 docker ps  # Verify all containers are running
 
 # 4. Initialize database
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 
-# 5. Start microservices (open 7 terminals)
+# 5. Initialize config files (IMPORTANT!)
+bash scripts/init-configs.sh
+# Or manually:
+# for svc in api_gateway identity_service conversation_service message_service delivery_service presence_service file_service; do
+#   cp services/$svc/configs/config.dev.yaml.example services/$svc/configs/config.dev.yaml
+# done
+# Then replace 'your_password' with 'imdev' in all config.dev.yaml files
+
+# 6. Start microservices (open 7 terminals)
 # Terminal 1
 cd services/identity_service && go run cmd/main.go
 
@@ -187,9 +195,18 @@ cd services/delivery_service && go run cmd/main.go
 # Terminal 7
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 
-# 6. Verify
+# 7. Verify
 curl http://localhost:8080/healthz
 ```
+
+**Config File Management:**
+
+| File | Description | Git Tracked |
+|------|-------------|-------------|
+| `config.dev.yaml.example` | Template with placeholders | ✅ Yes |
+| `config.dev.yaml` | Actual config with real passwords | ❌ No |
+| `config.prod.yaml.example` | Production template | ✅ Yes |
+| `config.prod.yaml` | Production config | ❌ No |
 
 **Service Endpoints**:
 | Service | URL |
@@ -310,13 +327,16 @@ git clone https://github.com/EthanQC/IM.git && cd IM
 # 2. System tuning
 sudo bash scripts/tune-macos.sh
 
-# 3. Start dependencies
+# 3. Initialize config files
+bash scripts/init-configs.sh
+
+# 4. Start dependencies
 make docker-deps-up
 
-# 4. Initialize database
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+# 5. Initialize database
+docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 
-# 5. Start all microservices (7 terminals or use tmux)
+# 6. Start all microservices (7 terminals or use tmux)
 cd services/identity_service && go run cmd/main.go
 cd services/conversation_service && go run cmd/main.go
 cd services/message_service && go run cmd/main.go
@@ -325,10 +345,10 @@ cd services/file_service && go run cmd/main.go
 cd services/delivery_service && go run cmd/main.go
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 
-# 6. Get IP (share with load test nodes)
+# 7. Get IP (share with load test nodes)
 ipconfig getifaddr en0  # e.g., 192.168.1.100
 
-# 7. Verify
+# 8. Verify
 curl http://localhost:8080/healthz
 ```
 

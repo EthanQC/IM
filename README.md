@@ -412,7 +412,45 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 ```
 
-#### 5. 启动微服务
+#### 5. 初始化配置文件
+
+各服务的配置文件需要从 `.example` 模板复制：
+
+```bash
+# 方式一：一键初始化（推荐）
+bash scripts/init-configs.sh
+
+# 方式二：手动复制（如需自定义配置）
+for svc in api_gateway identity_service conversation_service message_service delivery_service presence_service file_service; do
+  cp services/$svc/configs/config.dev.yaml.example services/$svc/configs/config.dev.yaml
+done
+
+# 批量替换密码（将 your_password 替换为 Docker Compose 默认密码 imdev）
+# macOS:
+find services -name "config.dev.yaml" -exec sed -i '' 's/your_password/imdev/g' {} \;
+# Linux:
+find services -name "config.dev.yaml" -exec sed -i 's/your_password/imdev/g' {} \;
+```
+
+**配置文件说明：**
+
+| 文件 | 说明 | 是否提交 Git |
+|------|------|-------------|
+| `config.dev.yaml.example` | 配置模板（占位符） | ✅ 提交 |
+| `config.dev.yaml` | 实际配置（含真实密码） | ❌ 不提交 |
+| `config.prod.yaml.example` | 生产环境模板 | ✅ 提交 |
+| `config.prod.yaml` | 生产环境配置 | ❌ 不提交 |
+
+**需要修改的配置项（仅当默认值不适用时）：**
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `mysql.dsn` | `root:imdev@tcp(127.0.0.1:3306)/im_db` | MySQL 连接串 |
+| `redis.addr` | `127.0.0.1:6379` | Redis 地址 |
+| `kafka.brokers` | `127.0.0.1:29092` | Kafka 地址 |
+| `jwt.secret` | 默认 32 字符 | JWT 密钥（生产环境必须修改） |
+
+#### 6. 启动微服务
 
 每个服务在独立终端启动（或使用 tmux/screen）：
 
@@ -439,7 +477,7 @@ cd services/file_service && go run cmd/main.go
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 ```
 
-#### 6. 验证部署
+#### 7. 验证部署
 
 ```bash
 # 健康检查
@@ -593,13 +631,16 @@ git clone https://github.com/EthanQC/IM.git && cd IM
 # 2. 系统调优
 sudo bash scripts/tune-macos.sh
 
-# 3. 启动依赖
+# 3. 初始化配置文件
+bash scripts/init-configs.sh
+
+# 4. 启动依赖
 make docker-deps-up
 
-# 4. 初始化数据库
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+# 5. 初始化数据库
+docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 
-# 5. 启动所有微服务（开 7 个终端或用 tmux）
+# 6. 启动所有微服务（开 7 个终端或用 tmux）
 cd services/identity_service && go run cmd/main.go
 cd services/conversation_service && go run cmd/main.go
 cd services/message_service && go run cmd/main.go
@@ -608,10 +649,10 @@ cd services/file_service && go run cmd/main.go
 cd services/delivery_service && go run cmd/main.go
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 
-# 6. 获取 IP（告知压测节点）
+# 7. 获取 IP（告知压测节点）
 ipconfig getifaddr en0  # 记录此 IP，如 192.168.1.100
 
-# 7. 验证
+# 8. 验证
 curl http://localhost:8080/healthz
 ```
 
