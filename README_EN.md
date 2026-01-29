@@ -409,18 +409,18 @@ curl http://192.168.1.100:8080/healthz
 cd IM/bench/wsbench
 
 # Warm-up test (verify environment)
-./wsbench -url=ws://192.168.1.100:8084/ws -c=1000 -d=1m -r=10s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=1000 -duration=1m -ramp=10s
 
 # Stepped load test (find limit)
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=5m -r=1m -o=connect_10k.txt
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=10m -r=2m -o=connect_30k.txt
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=10m -r=3m -o=connect_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=1m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=10m -ramp=2m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=10m -ramp=3m
 
 # Dual-machine combined (100k target)
 # Node-B:
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=nodeB_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 # Node-C (simultaneously):
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=nodeC_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 ```
 
 **Metrics to Record**:
@@ -457,16 +457,16 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # Fast ramp-up, test connection TPS
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=5s   # 2000 conn/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=2s   # 5000 conn/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=1s   # 10000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=5s   # 2000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=2s   # 5000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=1s   # 10000 conn/s
 ```
 
 #### 1.3 Heartbeat & Idle Connection Stability
 
 ```bash
 # Maintain 50k connections for 30 minutes, observe heartbeat
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=heartbeat_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 ```
 
 ---
@@ -478,14 +478,14 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 #### 2.1 Direct Chat Throughput & E2E Latency
 
 ```bash
-# Basic: 5k connections, 1 msg/s each = 5k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=5000 -d=5m -r=1m -msg-rate=1 -payload=100 -o=msg_5k_1.txt
+# Basic: 5k connections, 1 msg/min each
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=5000 -duration=5m -ramp=1m -mode=messaging -msg-rate=1 -payload-size=100
 
-# Medium: 10k connections, 5 msg/s each = 50k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=5m -r=2m -msg-rate=5 -payload=100 -o=msg_10k_5.txt
+# Medium: 10k connections, 5 msg/min each
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=2m -mode=messaging -msg-rate=5 -payload-size=100
 
-# High: 20k connections, 10 msg/s each = 200k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=20000 -d=5m -r=3m -msg-rate=10 -payload=100 -o=msg_20k_10.txt
+# High: 20k connections, 10 msg/min each
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=20000 -duration=5m -ramp=3m -mode=messaging -msg-rate=10 -payload-size=100
 ```
 
 **Metrics to Record**:
@@ -510,7 +510,7 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # 1. Establish 30k stable connections
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=10m -r=2m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=10m -ramp=2m
 
 # 2. During test, simulate network outage (on load test machine)
 kill -STOP $(pgrep wsbench)
@@ -549,8 +549,8 @@ kill -CONT $(pgrep wsbench)
 
 ```bash
 # Medium load, long duration
-# 30k connections + 10k msg/s, 4 hours
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=4h -r=10m -msg-rate=1 -o=soak_4h.txt
+# 30k connections, 1 msg/min each, 4 hours
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=4h -ramp=10m -mode=messaging -msg-rate=1
 
 # Continuous server monitoring
 while true; do
@@ -569,9 +569,9 @@ done > soak_metrics.log
 
 ```bash
 # Gradually increase message rate until rate limiting triggers
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=10   # 100k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=20   # 200k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=50   # 500k msg/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=10
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=20
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=50
 ```
 
 **Observe**:

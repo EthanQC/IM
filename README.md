@@ -650,7 +650,7 @@ cd services/delivery_service && go run cmd/main.go
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 
 # 7. 获取 IP（告知压测节点）
-ipconfig getifaddr en0  # 记录此 IP，如 192.168.1.100
+ipconfig getifaddr en1  # 记录此 IP，如 192.168.1.100
 
 # 8. 验证
 curl http://localhost:8080/healthz
@@ -658,10 +658,10 @@ curl http://localhost:8080/healthz
 
 #### Step 2: 压测节点准备 (WSL2)
 
-**在每台 Windows 机器上执行：**
+**方法一：在 Windows PowerShell 中执行**（按 `Win+X` → PowerShell）：
 
 ```powershell
-# Windows: 创建 .wslconfig（C:\Users\<用户名>\.wslconfig）
+# 创建 .wslconfig
 @"
 [wsl2]
 memory=28GB
@@ -674,28 +674,48 @@ localhostForwarding=true
 wsl --shutdown
 ```
 
+**方法二：手动创建 .wslconfig**（如果 PowerShell 报错）：
+
+1. 打开记事本
+2. 输入以下内容：
+   ```
+   [wsl2]
+   memory=28GB
+   processors=12
+   swap=16GB
+   localhostForwarding=true
+   ```
+3. 保存到 `C:\Users\你的用户名\.wslconfig`（文件名以点开头）
+4. 在 PowerShell 中执行 `wsl --shutdown`
+
 **进入 WSL2 后执行：**
 
 ```bash
 # 1. 系统调优（必须！）
 git clone https://github.com/EthanQC/IM.git && cd IM
 sudo bash scripts/tune-wsl.sh
+# 调优脚本会修改系统参数，无需重启 WSL
 
-# 2. 重新登录使 ulimit 生效
-exit
-# 重新进入 WSL
-
-# 3. 验证调优
+# 2. 验证调优（在同一终端直接执行）
 ulimit -n                           # 应显示 1000000
 sysctl net.core.somaxconn           # 应显示 65535
 sysctl net.ipv4.ip_local_port_range # 应显示 1024 65535
 
-# 4. 编译压测工具
+# 3. 编译压测工具
 cd IM/bench/wsbench && go build -o wsbench .
 
-# 5. 测试连通性（替换为 Node-A 的 IP）
+# 4. 测试连通性（替换为 Node-A 的实际 IP）
 ping 192.168.1.100
 curl http://192.168.1.100:8080/healthz
+
+# wsbench 参数说明：
+# -target    WebSocket URL
+# -conns     总连接数
+# -duration  压测持续时间
+# -ramp      爬坡时间（连接建立的时间跨度）
+# -msg-rate  每连接每分钟消息数（messaging 模式）
+# -payload-size 消息体大小（字节）
+# -output    输出格式: text, json, csv
 ```
 
 ---
@@ -713,18 +733,18 @@ curl http://192.168.1.100:8080/healthz
 cd IM/bench/wsbench
 
 # 预热测试（验证环境正常）
-./wsbench -url=ws://192.168.1.100:8084/ws -c=1000 -d=1m -r=10s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=1000 -duration=1m -ramp=10s
 
 # 阶梯压测（找到极限）
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=5m -r=1m -o=connect_10k.txt
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=10m -r=2m -o=connect_30k.txt
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=10m -r=3m -o=connect_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=1m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=10m -ramp=2m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=10m -ramp=3m
 
 # 双机联合（100k 目标）
 # Node-B 执行:
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=nodeB_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 # Node-C 同时执行:
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=nodeC_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 ```
 
 **需要记录的指标**：
@@ -761,9 +781,9 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # 快速爬坡，测试建连 TPS
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=5s   # 2000 conn/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=2s   # 5000 conn/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=1m -r=1s   # 10000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=5s   # 2000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=2s   # 5000 conn/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=1s   # 10000 conn/s
 ```
 
 **记录**：不同 ramp 时间下的失败率拐点
@@ -774,7 +794,7 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # 维持 50k 连接 30 分钟，观察心跳
-./wsbench -url=ws://192.168.1.100:8084/ws -c=50000 -d=30m -r=5m -o=heartbeat_50k.txt
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
 ```
 
 **需要记录**：
@@ -790,8 +810,8 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 # 需要在 wsbench 或服务端实现广播功能
 # 当前 wsbench 可通过 -msg-rate 模拟双向消息
 
-# 10k 连接，服务端每秒广播 1 条消息 = 10k msg/s 下行
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=5m -r=1m -msg-rate=1 -payload=100
+# 10k 连接，每连接每分钟 1 条消息
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=1m -mode=messaging -msg-rate=1 -payload-size=100
 ```
 
 ---
@@ -805,14 +825,14 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 **测试目标**：消息从发送到对端收到的完整链路
 
 ```bash
-# 基础：5k 连接，每连接 1 msg/s = 5k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=5000 -d=5m -r=1m -msg-rate=1 -payload=100 -o=msg_5k_1.txt
+# 基础：5k 连接，每连接每分钟 1 条消息
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=5000 -duration=5m -ramp=1m -mode=messaging -msg-rate=1 -payload-size=100
 
-# 中等：10k 连接，每连接 5 msg/s = 50k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=5m -r=2m -msg-rate=5 -payload=100 -o=msg_10k_5.txt
+# 中等：10k 连接，每连接每分钟 5 条消息
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=2m -mode=messaging -msg-rate=5 -payload-size=100
 
-# 高压：20k 连接，每连接 10 msg/s = 200k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=20000 -d=5m -r=3m -msg-rate=10 -payload=100 -o=msg_20k_10.txt
+# 高压：20k 连接，每连接每分钟 10 条消息
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=20000 -duration=5m -ramp=3m -mode=messaging -msg-rate=10 -payload-size=100
 ```
 
 **需要记录的指标**：
@@ -868,7 +888,7 @@ docker exec im_kafka kafka-consumer-groups.sh --bootstrap-server localhost:9092 
 
 ```bash
 # 1. 建立 30k 稳定连接
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=10m -r=2m
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=10m -ramp=2m
 
 # 2. 压测进行中，模拟断网（在压测机执行）
 #    方法：暂停 wsbench 进程 10 秒
@@ -907,7 +927,7 @@ kill -CONT $(pgrep wsbench)
 ```bash
 # 大量用户频繁上下线
 # 可通过快速建连-断开-建连模拟
-./wsbench -url=ws://192.168.1.100:8084/ws -c=5000 -d=30s -r=5s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=5000 -duration=30s -ramp=5s
 # 脚本循环执行，观察 Redis 写入压力
 ```
 
@@ -921,8 +941,8 @@ kill -CONT $(pgrep wsbench)
 
 ```bash
 # 中等负载长时间运行
-# 30k 连接 + 10k msg/s，持续 4 小时
-./wsbench -url=ws://192.168.1.100:8084/ws -c=30000 -d=4h -r=10m -msg-rate=1 -o=soak_4h.txt
+# 30k 连接，每连接每分钟 1 条消息，持续 4 小时
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=4h -ramp=10m -mode=messaging -msg-rate=1
 
 # 同时持续监控服务端
 # 新开终端执行：
@@ -944,9 +964,9 @@ done > soak_metrics.log
 
 ```bash
 # 逐步提高消息速率，直到触发限流
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=10   # 100k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=20   # 200k msg/s
-./wsbench -url=ws://192.168.1.100:8084/ws -c=10000 -d=3m -msg-rate=50   # 500k msg/s
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=10
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=20
+./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=50
 ```
 
 **观察**：
