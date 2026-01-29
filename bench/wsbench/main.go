@@ -34,6 +34,16 @@ type Config struct {
 	UserFile     string        // 用户文件路径
 	Output       string        // 输出格式：text, json
 	Verbose      bool          // 详细输出
+
+	// 高并发优化参数
+	HandshakeTimeout  time.Duration // 握手超时
+	ReadBufferSize    int           // 读缓冲区大小
+	WriteBufferSize   int           // 写缓冲区大小
+	MaxConnsPerSecond int           // 每秒最大连接数（限速）
+	RetryAttempts     int           // 连接重试次数
+	RetryDelay        time.Duration // 重试延迟
+	ReadTimeout       time.Duration // 读超时
+	WriteTimeout      time.Duration // 写超时
 }
 
 // Stats 统计数据
@@ -135,6 +145,9 @@ func main() {
 	fmt.Printf("持续时间: %s\n", cfg.Duration)
 	fmt.Printf("爬坡时间: %s\n", cfg.Ramp)
 	fmt.Printf("心跳间隔: %s\n", cfg.PingInterval)
+	fmt.Printf("握手超时: %s\n", cfg.HandshakeTimeout)
+	fmt.Printf("最大连接速率: %d/秒\n", cfg.MaxConnsPerSecond)
+	fmt.Printf("重试次数: %d\n", cfg.RetryAttempts)
 	fmt.Println()
 
 	stats := &Stats{
@@ -190,6 +203,16 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.Output, "output", "text", "输出格式: text, json, csv")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "详细输出")
 
+	// 高并发优化参数
+	flag.DurationVar(&cfg.HandshakeTimeout, "handshake-timeout", 30*time.Second, "WebSocket握手超时")
+	flag.IntVar(&cfg.ReadBufferSize, "read-buffer", 8192, "读缓冲区大小")
+	flag.IntVar(&cfg.WriteBufferSize, "write-buffer", 8192, "写缓冲区大小")
+	flag.IntVar(&cfg.MaxConnsPerSecond, "max-cps", 500, "每秒最大连接数（限速）")
+	flag.IntVar(&cfg.RetryAttempts, "retry", 3, "连接重试次数")
+	flag.DurationVar(&cfg.RetryDelay, "retry-delay", 1*time.Second, "重试延迟")
+	flag.DurationVar(&cfg.ReadTimeout, "read-timeout", 120*time.Second, "读超时")
+	flag.DurationVar(&cfg.WriteTimeout, "write-timeout", 10*time.Second, "写超时")
+
 	flag.Parse()
 
 	return cfg
@@ -199,13 +222,17 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 	var wg sync.WaitGroup
 	connCh := make(chan *Conn, cfg.Conns)
 
-	// 计算每秒连接数（爬坡）
+	// 使用批量连接方式，控制每秒连接数
 	connsPerSecond := float64(cfg.Conns) / cfg.Ramp.Seconds()
 	if connsPerSecond < 1 {
 		connsPerSecond = 1
 	}
+	// 限制最大连接速率
+	if connsPerSecond > float64(cfg.MaxConnsPerSecond) {
+		connsPerSecond = float64(cfg.MaxConnsPerSecond)
+	}
 
-	fmt.Printf("爬坡速率: %.1f 连接/秒\n\n", connsPerSecond)
+	fmt.Printf("爬坡速率: %.1f 连接/秒 (限制: %d/秒)\n\n", connsPerSecond, cfg.MaxConnsPerSecond)
 
 	// 进度条
 	bar := progressbar.NewOptions(cfg.Conns,
@@ -216,8 +243,17 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 		progressbar.OptionSetItsString("conn"),
 	)
 
-	// 爬坡建立连接
-	ticker := time.NewTicker(time.Duration(float64(time.Second) / connsPerSecond))
+	// 使用信号量控制并发连接数
+	sem := make(chan struct{}, cfg.MaxConnsPerSecond)
+
+	// 爬坡建立连接 - 使用批量方式
+	batchSize := int(connsPerSecond / 10) // 每100ms一批
+	if batchSize < 1 {
+		batchSize = 1
+	}
+	batchInterval := time.Duration(float64(time.Second) / (connsPerSecond / float64(batchSize)))
+
+	ticker := time.NewTicker(batchInterval)
 	defer ticker.Stop()
 
 	connID := 0
@@ -228,26 +264,39 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 		case <-ctx.Done():
 			rampDone = true
 		case <-ticker.C:
-			if connID >= cfg.Conns {
-				rampDone = true
-				continue
+			// 每次批量创建连接
+			for i := 0; i < batchSize && connID < cfg.Conns; i++ {
+				id := connID
+				connID++
+
+				select {
+				case sem <- struct{}{}:
+				case <-ctx.Done():
+					rampDone = true
+					break
+				}
+
+				wg.Add(1)
+				go func(id int) {
+					defer func() {
+						wg.Done()
+						<-sem
+					}()
+					conn := createConnectionWithRetry(ctx, id, cfg, stats)
+					if conn != nil {
+						select {
+						case connCh <- conn:
+						case <-ctx.Done():
+							conn.conn.Close()
+						}
+					}
+					bar.Add(1)
+				}(id)
 			}
 
-			wg.Add(1)
-			go func(id int) {
-				defer wg.Done()
-				conn := createConnection(ctx, id, cfg, stats)
-				if conn != nil {
-					select {
-					case connCh <- conn:
-					case <-ctx.Done():
-						// context 已取消，关闭连接
-						conn.conn.Close()
-					}
-				}
-				bar.Add(1)
-			}(connID)
-			connID++
+			if connID >= cfg.Conns {
+				rampDone = true
+			}
 		}
 	}
 
@@ -327,31 +376,59 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 	}
 }
 
-func createConnection(ctx context.Context, id int, cfg Config, stats *Stats) *Conn {
-	atomic.AddInt64(&stats.TotalAttempts, 1)
+func createConnectionWithRetry(ctx context.Context, id int, cfg Config, stats *Stats) *Conn {
+	var lastErr error
+	for attempt := 0; attempt <= cfg.RetryAttempts; attempt++ {
+		if attempt > 0 {
+			// 指数退避重试
+			delay := cfg.RetryDelay * time.Duration(1<<(attempt-1))
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(delay):
+			}
+		}
+
+		conn := createConnection(ctx, id, cfg, stats, attempt > 0)
+		if conn != nil {
+			return conn
+		}
+		lastErr = fmt.Errorf("connection attempt %d failed", attempt+1)
+	}
+
+	if cfg.Verbose && lastErr != nil {
+		fmt.Printf("连接 %d 最终失败，共尝试 %d 次\n", id, cfg.RetryAttempts+1)
+	}
+	return nil
+}
+
+func createConnection(ctx context.Context, id int, cfg Config, stats *Stats, isRetry bool) *Conn {
+	if !isRetry {
+		atomic.AddInt64(&stats.TotalAttempts, 1)
+	}
 
 	start := time.Now()
 
 	// 构建 URL
 	url := fmt.Sprintf("%s?user_id=%d&device_id=bench_%d&platform=bench", cfg.Target, 100000+id, id)
 
-	// 创建 dialer
+	// 创建 dialer - 优化缓冲区和超时
 	dialer := websocket.Dialer{
-		HandshakeTimeout: 10 * time.Second,
-		ReadBufferSize:   4096,
-		WriteBufferSize:  4096,
+		HandshakeTimeout:  cfg.HandshakeTimeout,
+		ReadBufferSize:    cfg.ReadBufferSize,
+		WriteBufferSize:   cfg.WriteBufferSize,
+		EnableCompression: false, // 禁用压缩以提高性能
 	}
 
 	// 连接
 	header := http.Header{}
-	ws, _, err := dialer.DialContext(ctx, url, header)
+	ws, resp, err := dialer.DialContext(ctx, url, header)
 	if err != nil {
-		atomic.AddInt64(&stats.FailedConns, 1)
-		stats.mu.Lock()
-		errStr := err.Error()
-		if len(errStr) > 50 {
-			errStr = errStr[:50]
+		if !isRetry {
+			atomic.AddInt64(&stats.FailedConns, 1)
 		}
+		stats.mu.Lock()
+		errStr := categorizeError(err, resp)
 		stats.Errors[errStr]++
 		stats.mu.Unlock()
 
@@ -377,6 +454,54 @@ func createConnection(ctx context.Context, id int, cfg Config, stats *Stats) *Co
 	}
 }
 
+// categorizeError 分类错误，便于分析
+func categorizeError(err error, resp *http.Response) string {
+	errStr := err.Error()
+
+	// HTTP 响应错误
+	if resp != nil {
+		return fmt.Sprintf("http_%d", resp.StatusCode)
+	}
+
+	// 常见错误分类
+	switch {
+	case contains(errStr, "connection refused"):
+		return "conn_refused"
+	case contains(errStr, "connection reset"):
+		return "conn_reset"
+	case contains(errStr, "timeout"):
+		return "timeout"
+	case contains(errStr, "too many open files"):
+		return "fd_exhausted"
+	case contains(errStr, "no such host"):
+		return "dns_error"
+	case contains(errStr, "network is unreachable"):
+		return "network_unreachable"
+	case contains(errStr, "i/o timeout"):
+		return "io_timeout"
+	case contains(errStr, "EOF"):
+		return "eof"
+	default:
+		if len(errStr) > 30 {
+			return errStr[:30]
+		}
+		return errStr
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, duration time.Duration) {
 	defer func() {
 		c.mu.Lock()
@@ -388,16 +513,16 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 		atomic.AddInt64(&stats.CurrentConns, -1)
 	}()
 
-	// 设置 Ping 处理器 - 服务端发来 Ping 时自动回 Pong
-	c.conn.SetPingHandler(func(appData string) error {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if c.conn == nil {
-			return nil
-		}
-		c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-		return c.conn.WriteMessage(websocket.PongMessage, []byte(appData))
+	// 设置 Pong 处理器 - 记录服务端回复的 Pong (WebSocket协议层)
+	c.conn.SetPongHandler(func(appData string) error {
+		atomic.AddInt64(&stats.PongsReceived, 1)
+		// 收到Pong后重置读超时
+		c.conn.SetReadDeadline(time.Now().Add(cfg.ReadTimeout))
+		return nil
 	})
+
+	// 设置读超时，防止连接假死
+	c.conn.SetReadDeadline(time.Now().Add(cfg.ReadTimeout))
 
 	// 读取消息的 goroutine
 	readDone := make(chan struct{})
@@ -412,15 +537,20 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 				return
 			}
 
-			// 设置读超时为心跳间隔的 3 倍（服务端 pongWait 是 60s）
-			conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 					atomic.AddInt64(&stats.Disconnects, 1)
+					stats.mu.Lock()
+					errStr := "read_" + categorizeError(err, nil)
+					stats.Errors[errStr]++
+					stats.mu.Unlock()
 				}
 				return
 			}
+
+			// 收到消息后重置读超时
+			c.conn.SetReadDeadline(time.Now().Add(cfg.ReadTimeout))
 
 			atomic.AddInt64(&stats.MessagesReceived, 1)
 
@@ -434,7 +564,10 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 		}
 	}()
 
-	// 心跳 ticker
+	// 心跳 ticker - 使用抖动避免所有连接同时发心跳
+	jitter := time.Duration(c.id%1000) * time.Millisecond
+	time.Sleep(jitter) // 初始抖动
+
 	pingTicker := time.NewTicker(cfg.PingInterval)
 	defer pingTicker.Stop()
 
@@ -457,7 +590,7 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 		case <-readDone:
 			return
 		case <-pingTicker.C:
-			sendPing(c, stats)
+			sendPing(c, cfg, stats)
 		default:
 			if msgTicker != nil {
 				select {
@@ -471,7 +604,7 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 	}
 }
 
-func sendPing(c *Conn, stats *Stats) {
+func sendPing(c *Conn, cfg Config, stats *Stats) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -485,7 +618,7 @@ func sendPing(c *Conn, stats *Stats) {
 	}
 	data, _ := json.Marshal(msg)
 
-	c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	c.conn.SetWriteDeadline(time.Now().Add(cfg.WriteTimeout))
 	if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		stats.mu.Lock()
 		stats.Errors["ping_failed"]++

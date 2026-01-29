@@ -19,9 +19,13 @@ fi
 
 echo ">>> [1/3] 调整内核参数..."
 
-# 文件描述符
-sysctl -w kern.maxfiles=2000000
-sysctl -w kern.maxfilesperproc=1000000
+# 文件描述符（支持 100k+ 连接）
+sysctl -w kern.maxfiles=500000
+sysctl -w kern.maxfilesperproc=500000
+
+# TCP 连接队列（关键！默认 128 太小，但不要设太大）
+# 8192 对于 100k 连接足够，设太大反而可能导致系统不稳定
+sysctl -w kern.ipc.somaxconn=8192
 
 # 网络参数
 sysctl -w net.inet.ip.portrange.first=1024
@@ -40,6 +44,7 @@ echo ">>> [3/3] 验证配置..."
 echo ""
 echo "maxfiles: $(sysctl -n kern.maxfiles)"
 echo "maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
+echo "somaxconn: $(sysctl -n kern.ipc.somaxconn)"
 echo "端口范围: $(sysctl -n net.inet.ip.portrange.first) - $(sysctl -n net.inet.ip.portrange.last)"
 echo "launchctl maxfiles: $(launchctl limit maxfiles)"
 echo ""

@@ -19,16 +19,18 @@ import (
 const (
 	// 写超时
 	writeWait = 10 * time.Second
-	// Pong等待时间
-	pongWait = 60 * time.Second
-	// Ping周期（必须小于pongWait）
-	pingPeriod = 30 * time.Second
+	// Pong等待时间 - 增加到120秒以适应高并发
+	pongWait = 120 * time.Second
+	// Ping周期（必须小于pongWait）- 使用45秒给客户端更多响应时间
+	pingPeriod = 45 * time.Second
 	// 最大消息大小
 	maxMessageSize = 64 * 1024
 	// 心跳超时
-	heartbeatTimeout = 90 * time.Second
+	heartbeatTimeout = 150 * time.Second
 	// 重连检测间隔
 	reconnectCheckInterval = 5 * time.Second
+	// 发送缓冲区大小 - 增大以避免阻塞
+	sendBufferSize = 512
 )
 
 // WSMessageType WebSocket消息类型
@@ -111,7 +113,7 @@ func NewEnhancedWSConnection(
 		deviceID:    deviceID,
 		platform:    platform,
 		serverAddr:  serverAddr,
-		send:        make(chan []byte, 256),
+		send:        make(chan []byte, sendBufferSize),
 		lastPingAt:  now,
 		lastPongAt:  now,
 		connectedAt: now,
@@ -149,8 +151,14 @@ func (c *EnhancedWSConnection) Send(message []byte) error {
 	select {
 	case c.send <- message:
 		return nil
-	default:
-		return fmt.Errorf("send buffer full")
+	case <-time.After(100 * time.Millisecond):
+		// 超时而不是立即返回错误，给一点缓冲时间
+		select {
+		case c.send <- message:
+			return nil
+		default:
+			return fmt.Errorf("send buffer full")
+		}
 	}
 }
 
@@ -614,11 +622,14 @@ func NewEnhancedWSServer(
 		ackUseCase:  ackUseCase,
 		signalingUC: signalingUC,
 		upgrader: websocket.Upgrader{
-			ReadBufferSize:  4096,
-			WriteBufferSize: 4096,
+			ReadBufferSize:    8192,  // 增大缓冲区
+			WriteBufferSize:   8192,  // 增大缓冲区
+			EnableCompression: false, // 禁用压缩以提高性能
 			CheckOrigin: func(r *http.Request) bool {
 				return true // 生产环境应该校验Origin
 			},
+			// 增加握手超时
+			HandshakeTimeout: 30 * time.Second,
 		},
 	}
 }

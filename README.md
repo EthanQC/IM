@@ -622,43 +622,61 @@ sudo certbot --nginx -d your-domain.com
 
 > ⚠️ **系统调优是高并发的前提**，不调优会遇到假瓶颈（FD 耗尽、端口耗尽、TIME_WAIT 堆积）
 
-#### Step 1: 服务节点准备 (Mac Mini)
+#### Step 1: 服务节点准备 (Mac Mini / Linux 服务器)
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/EthanQC/IM.git && cd IM
 
-# 2. 系统调优
-sudo bash scripts/tune-macos.sh
+# 2. 系统调优（必须！100k 连接需要调优）
+# macOS:
+sudo bash scripts/tune-server.sh
 
-# 3. 初始化配置文件
+# Linux:
+sudo bash scripts/tune-server.sh
+# Linux 调优后需要重新登录使 limits.conf 生效
+
+# 3. 验证调优结果
+ulimit -n                # 应显示 >= 1000000
+sysctl kern.ipc.somaxconn 2>/dev/null || sysctl net.core.somaxconn  # 应显示 >= 65535
+
+# 4. 初始化配置文件
 bash scripts/init-configs.sh
 
-# 4. 启动依赖
+# 5. 启动依赖
 make docker-deps-up
 
-# 5. 初始化数据库
+# 6. 初始化数据库
 docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
 
-# 6. 启动所有微服务（开 7 个终端或用 tmux）
+# 7. 启动所有微服务（开 7 个终端或用 tmux）
+# 注意：每个终端都要先设置 ulimit
+ulimit -n 1000000
+
 cd services/identity_service && go run cmd/main.go
 cd services/conversation_service && go run cmd/main.go
 cd services/message_service && go run cmd/main.go
 cd services/presence_service && go run cmd/main.go
 cd services/file_service && go run cmd/main.go
-cd services/delivery_service && go run cmd/main.go
+cd services/delivery_service && go run cmd/main.go  # 关键：WebSocket 服务
 cd services/api_gateway && go run cmd/main.go cmd/handlers.go
 
-# 7. 获取 IP（告知压测节点）
-ipconfig getifaddr en1  # 记录此 IP，如 192.168.1.100
+# 8. 获取 IP（告知压测节点）
+# macOS:
+ipconfig getifaddr en0 || ipconfig getifaddr en1
+# Linux:
+hostname -I | awk '{print $1}'
 
-# 8. 验证
+# 9. 验证服务
 curl http://localhost:8080/healthz
+curl http://localhost:8084/stats  # WebSocket 服务状态
 ```
 
-#### Step 2: 压测节点准备 (WSL2)
+#### Step 2: 压测节点准备 (WSL2 / Linux / macOS)
 
-**方法一：在 Windows PowerShell 中执行**（按 `Win+X` → PowerShell）：
+**方法一：WSL2 环境配置**
+
+在 Windows PowerShell 中执行（`Win+X` → PowerShell）：
 
 ```powershell
 # 创建 .wslconfig
@@ -674,49 +692,77 @@ localhostForwarding=true
 wsl --shutdown
 ```
 
-**方法二：手动创建 .wslconfig**（如果 PowerShell 报错）：
-
-1. 打开记事本
-2. 输入以下内容：
-   ```
-   [wsl2]
-   memory=28GB
-   processors=12
-   swap=16GB
-   localhostForwarding=true
-   ```
-3. 保存到 `C:\Users\你的用户名\.wslconfig`（文件名以点开头）
-4. 在 PowerShell 中执行 `wsl --shutdown`
-
 **进入 WSL2 后执行：**
 
 ```bash
-# 1. 系统调优（必须！）
+# 1. 克隆项目
 git clone https://github.com/EthanQC/IM.git && cd IM
-sudo bash scripts/tune-wsl.sh
-# 调优脚本会修改系统参数，无需重启 WSL
 
-# 2. 验证调优（在同一终端直接执行）
-ulimit -n                           # 应显示 1000000
+# 2. 系统调优（必须！）
+sudo bash scripts/tune-bench-client.sh
+
+# 3. 验证调优（在同一终端直接执行）
+ulimit -n                           # 应显示 >= 500000
 sysctl net.core.somaxconn           # 应显示 65535
 sysctl net.ipv4.ip_local_port_range # 应显示 1024 65535
 
-# 3. 编译压测工具
-cd IM/bench/wsbench && go build -o wsbench .
+# 4. 编译压测工具
+cd bench/wsbench && go build -o wsbench .
 
-# 4. 测试连通性（替换为 Node-A 的实际 IP）
-ping 192.168.1.100
-curl http://192.168.1.100:8080/healthz
-
-# wsbench 参数说明：
-# -target    WebSocket URL
-# -conns     总连接数
-# -duration  压测持续时间
-# -ramp      爬坡时间（连接建立的时间跨度）
-# -msg-rate  每连接每分钟消息数（messaging 模式）
-# -payload-size 消息体大小（字节）
-# -output    输出格式: text, json, csv
+# 5. 查看压测参数
+./wsbench --help
 ```
+
+**方法二：macOS 压测机器**
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/EthanQC/IM.git && cd IM
+
+# 2. 系统调优
+sudo bash scripts/tune-bench-client.sh
+
+# 3. 验证
+ulimit -n  # 应显示 >= 500000
+
+# 4. 编译压测工具
+cd bench/wsbench && go build -o wsbench .
+```
+
+#### Step 3: 测试连通性
+
+```bash
+# 替换为 Node-A 的实际 IP
+SERVER_IP="192.168.1.100"
+
+ping $SERVER_IP
+curl http://$SERVER_IP:8080/healthz
+curl http://$SERVER_IP:8084/stats
+
+# 快速验证 WebSocket 连接
+./wsbench --target=ws://$SERVER_IP:8084/ws --conns=100 --duration=30s --ramp=5s
+```
+
+#### wsbench 参数说明
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--target` | ws://localhost:8084/ws | WebSocket 服务器地址 |
+| `--conns` | 1000 | 目标连接数 |
+| `--duration` | 5m | 压测持续时间 |
+| `--ramp` | 1m | 爬坡时间（建立连接的时间跨度） |
+| `--ping-interval` | 30s | 心跳间隔 |
+| `--handshake-timeout` | 30s | 握手超时（高并发时需要更长） |
+| `--max-cps` | 500 | **每秒最大连接数（限速，避免瞬时压力过大）** |
+| `--retry` | 3 | **连接失败重试次数** |
+| `--retry-delay` | 1s | **重试延迟（指数退避）** |
+| `--read-timeout` | 2m | **读超时（防止连接假死）** |
+| `--write-timeout` | 10s | 写超时 |
+| `--read-buffer` | 8192 | 读缓冲区大小 |
+| `--write-buffer` | 8192 | 写缓冲区大小 |
+| `--mode` | connect-only | 模式：connect-only / messaging |
+| `--msg-rate` | 10 | 每连接每分钟消息数（messaging 模式） |
+| `--output` | text | 输出格式：text / json / csv |
 
 ---
 
@@ -732,19 +778,60 @@ curl http://192.168.1.100:8080/healthz
 # ===== 在压测节点执行 =====
 cd IM/bench/wsbench
 
+# 设置 ulimit（每个终端都要执行）
+ulimit -n 500000
+
 # 预热测试（验证环境正常）
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=1000 -duration=1m -ramp=10s
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=1000 --duration=1m --ramp=10s
 
 # 阶梯压测（找到极限）
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=1m
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=10m -ramp=2m
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=10m -ramp=3m
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=5m --ramp=1m --max-cps=500
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=30000 --duration=10m --ramp=3m --max-cps=500
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=50000 --duration=10m --ramp=5m --max-cps=500
 
-# 双机联合（100k 目标）
+# ===== 双机联合 100k 目标 =====
+# 使用一键脚本（推荐）：
 # Node-B 执行:
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
+bash scripts/run-50k-bench.sh 192.168.1.100:8084
+
 # Node-C 同时执行:
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
+bash scripts/run-50k-bench.sh 192.168.1.100:8084
+
+# 或手动执行（带完整参数）：
+# Node-B:
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=50000 \
+    --duration=30m \
+    --ramp=5m \
+    --ping-interval=45s \
+    --handshake-timeout=30s \
+    --max-cps=500 \
+    --retry=3 \
+    --retry-delay=2s \
+    --read-timeout=120s
+
+# Node-C 同时执行相同命令
+```
+
+**实时监控（在 Node-A 执行）**：
+
+```bash
+# 方法一：使用监控脚本（推荐）
+bash scripts/monitor-bench.sh localhost:8084
+
+# 方法二：手动监控
+# 终端1: 连接数
+watch -n 1 'curl -s http://localhost:8084/stats'
+
+# 终端2: Goroutine 数量
+watch -n 1 'curl -s http://localhost:8084/metrics | grep go_goroutines'
+
+# 终端3: 内存使用
+watch -n 1 'curl -s http://localhost:8084/metrics | grep go_memstats_heap_inuse_bytes'
+
+# 终端4: 网络连接状态
+watch -n 2 'netstat -an | grep 8084 | grep ESTABLISHED | wc -l'
 ```
 
 **需要记录的指标**：
@@ -755,26 +842,34 @@ cd IM/bench/wsbench
 | 稳定维持时长 | 无大规模断连 | 30min+ |
 | 建连失败率 | 429/5xx/超时/reset | < 1% |
 | 建连延迟 p50/p95/p99 | 握手耗时 | < 100ms |
-| 服务端 FD 使用 | `lsof -p <PID> \| wc -l` | 记录值 |
-| 服务端内存 | `top` / `htop` | 记录曲线 |
+| 断开连接数 | 压测期间意外断开 | < 1% |
+| 服务端 Goroutine | curl metrics | ~2x 连接数 |
+| 服务端内存 | heap_inuse_bytes | 记录曲线 |
 | GC Pause | pprof 或日志 | < 10ms |
 
-**服务端监控命令**（在 Node-A 执行）：
+**常见问题排查**：
 
-> ⚠️ **macOS 用户需先安装工具**：`brew install watch htop graphviz`
+| 错误类型 | 可能原因 | 解决方案 |
+|----------|----------|----------|
+| `conn_refused` | 服务端未启动或端口未开放 | 检查服务状态和防火墙 |
+| `timeout` | 握手超时 | 增加 `--handshake-timeout` |
+| `fd_exhausted` | 文件描述符耗尽 | 运行 `tune-bench-client.sh` |
+| `conn_reset` | 服务端资源不足或被限流 | 降低 `--max-cps` |
+| `eof` | 连接被服务端关闭 | 检查服务端日志 |
+
+**pprof 分析（压测进行时）**：
 
 ```bash
-# 实时连接数
-watch -n 1 'curl -s http://localhost:8084/metrics | grep ws_connections'
+# 需要先安装 graphviz: brew install graphviz (macOS) 或 apt install graphviz (Linux)
 
-# FD 使用（macOS 用 lsof，找到 delivery 进程 PID）
-watch -n 5 'lsof -p $(pgrep -f delivery_service) | wc -l'
-
-# 内存和 CPU（macOS 需要 sudo）
-sudo htop
-
-# pprof 分析（压测进行时，需要 graphviz）
+# 内存分析
 go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
+
+# Goroutine 分析
+go tool pprof -http=:8001 http://localhost:8084/debug/pprof/goroutine
+
+# CPU 分析（30秒采样）
+go tool pprof -http=:8002 http://localhost:8084/debug/pprof/profile?seconds=30
 ```
 
 #### 1.2 建连速率上限 (Ramp-up)
@@ -782,13 +877,16 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 **测试目标**：测试每秒能新建多少连接
 
 ```bash
-# 快速爬坡，测试建连 TPS
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=5s   # 2000 conn/s
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=2s   # 5000 conn/s
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=1m -ramp=1s   # 10000 conn/s
+# 注意：压测工具默认限制 500 conn/s，可通过 --max-cps 调整
+
+# 测试不同连接速率
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=2m --ramp=20s --max-cps=500   # 500 conn/s
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=2m --ramp=10s --max-cps=1000  # 1000 conn/s
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=2m --ramp=5s --max-cps=2000   # 2000 conn/s
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=2m --ramp=2s --max-cps=5000   # 5000 conn/s
 ```
 
-**记录**：不同 ramp 时间下的失败率拐点
+**记录**：不同 `--max-cps` 下的失败率拐点
 
 #### 1.3 心跳与空闲连接稳定性
 
@@ -796,24 +894,44 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # 维持 50k 连接 30 分钟，观察心跳
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=50000 -duration=30m -ramp=5m
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=50000 \
+    --duration=30m \
+    --ramp=5m \
+    --ping-interval=45s \
+    --read-timeout=120s
 ```
 
 **需要记录**：
-- 心跳 RTT 分位（p50/p95/p99）
-- 超时断开率
-- 重连次数
+- Ping/Pong 成功率（应接近 100%）
+- 超时断开数
+- 最终连接数 vs 初始连接数
 
 #### 1.4 广播下行压力
 
 **测试目标**：服务端向所有连接推送小消息的能力
 
 ```bash
-# 需要在 wsbench 或服务端实现广播功能
-# 当前 wsbench 可通过 -msg-rate 模拟双向消息
+# 10k 连接，每连接每分钟 1 条消息（messaging 模式）
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=10000 \
+    --duration=5m \
+    --ramp=1m \
+    --mode=messaging \
+    --msg-rate=1 \
+    --payload-size=100
 
-# 10k 连接，每连接每分钟 1 条消息
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=1m -mode=messaging -msg-rate=1 -payload-size=100
+# 更高压力：每连接每分钟 5 条消息
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=10000 \
+    --duration=5m \
+    --ramp=1m \
+    --mode=messaging \
+    --msg-rate=5 \
+    --payload-size=100
 ```
 
 ---
@@ -828,13 +946,34 @@ go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 
 ```bash
 # 基础：5k 连接，每连接每分钟 1 条消息
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=5000 -duration=5m -ramp=1m -mode=messaging -msg-rate=1 -payload-size=100
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=5000 \
+    --duration=5m \
+    --ramp=1m \
+    --mode=messaging \
+    --msg-rate=1 \
+    --payload-size=100
 
 # 中等：10k 连接，每连接每分钟 5 条消息
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=5m -ramp=2m -mode=messaging -msg-rate=5 -payload-size=100
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=10000 \
+    --duration=5m \
+    --ramp=2m \
+    --mode=messaging \
+    --msg-rate=5 \
+    --payload-size=100
 
 # 高压：20k 连接，每连接每分钟 10 条消息
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=20000 -duration=5m -ramp=3m -mode=messaging -msg-rate=10 -payload-size=100
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=20000 \
+    --duration=5m \
+    --ramp=3m \
+    --mode=messaging \
+    --msg-rate=10 \
+    --payload-size=100
 ```
 
 **需要记录的指标**：
@@ -944,14 +1083,21 @@ kill -CONT $(pgrep wsbench)
 ```bash
 # 中等负载长时间运行
 # 30k 连接，每连接每分钟 1 条消息，持续 4 小时
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=30000 -duration=4h -ramp=10m -mode=messaging -msg-rate=1
+./wsbench \
+    --target=ws://192.168.1.100:8084/ws \
+    --conns=30000 \
+    --duration=4h \
+    --ramp=10m \
+    --mode=messaging \
+    --msg-rate=1 \
+    --ping-interval=45s \
+    --read-timeout=120s
 
-# 同时持续监控服务端
-# 新开终端执行：
+# 同时持续监控服务端（新开终端）
 while true; do
-  echo "$(date): $(curl -s http://localhost:8084/metrics | grep -E 'go_goroutines|go_memstats')"
+  echo "$(date): conns=$(curl -s http://localhost:8084/stats | grep -o '"total_connections":[0-9]*' | cut -d':' -f2) goroutines=$(curl -s http://localhost:8084/metrics | grep '^go_goroutines ' | awk '{print $2}') heap=$(curl -s http://localhost:8084/metrics | grep '^go_memstats_heap_inuse_bytes ' | awk '{print $2}')"
   sleep 60
-done > soak_metrics.log
+done | tee soak_metrics.log
 ```
 
 **需要记录**：
@@ -966,9 +1112,9 @@ done > soak_metrics.log
 
 ```bash
 # 逐步提高消息速率，直到触发限流
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=10
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=20
-./wsbench -target=ws://192.168.1.100:8084/ws -conns=10000 -duration=3m -mode=messaging -msg-rate=50
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=3m --ramp=1m --mode=messaging --msg-rate=10
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=3m --ramp=1m --mode=messaging --msg-rate=20
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=3m --ramp=1m --mode=messaging --msg-rate=50
 ```
 
 **观察**：
@@ -1032,29 +1178,121 @@ docker restart im_redis
 
 ```bash
 # ===== 服务端 (Node-A) =====
-# Prometheus 指标
-curl http://localhost:8084/metrics | grep -E "ws_|msg_|go_"
+
+# 一键监控脚本（推荐）
+bash scripts/monitor-bench.sh localhost:8084
+
+# 手动监控命令
+# 实时连接统计
+watch -n 1 'curl -s http://localhost:8084/stats'
+
+# Goroutine 数量（每个连接约 2 个）
+watch -n 1 'curl -s http://localhost:8084/metrics | grep "^go_goroutines "'
+
+# 内存使用
+watch -n 1 'curl -s http://localhost:8084/metrics | grep "^go_memstats_heap_inuse_bytes "'
+
+# 网络连接状态
+watch -n 2 'netstat -an | grep 8084 | grep ESTABLISHED | wc -l'
 
 # pprof 分析
 go tool pprof http://localhost:8084/debug/pprof/heap
 go tool pprof http://localhost:8084/debug/pprof/goroutine
 go tool pprof -http=:8000 http://localhost:8084/debug/pprof/profile?seconds=30
 
-# 实时资源
-htop
-watch -n 1 'ss -s | grep estab'
-
 # ===== 压测端 (Node-B/C) =====
+
+# 确认 ulimit
+ulimit -n  # 应 >= 500000
+
 # 连接状态
 ss -s | grep estab
-ss -tuln | wc -l
+netstat -an | grep ESTABLISHED | wc -l
 
-# 端口使用
+# 端口使用情况
+# Linux:
 cat /proc/sys/net/ipv4/ip_local_port_range
+# macOS:
+sysctl net.inet.ip.portrange.first net.inet.ip.portrange.last
 
-# 网络统计
-netstat -s | grep -E "segments|connections"
+# 查看压测错误分布
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=1000 --duration=1m --verbose
+```
+
+### 新增脚本说明
+
+| 脚本 | 位置 | 用途 |
+|------|------|------|
+| `tune-server.sh` | scripts/ | 服务端系统调优（支持 100k+ 连接） |
+| `tune-bench-client.sh` | scripts/ | 压测客户端系统调优 |
+| `monitor-bench.sh` | scripts/ | 实时监控压测状态 |
+| `run-50k-bench.sh` | scripts/ | 一键运行 50k 连接压测 |
+
+---
 ## 常见问题
+
+### 压测相关问题
+
+#### Q: 压测时大量连接建立失败？
+
+1. **检查系统调优**：
+   ```bash
+   # 压测机器
+   ulimit -n  # 应 >= 500000
+   
+   # 服务端
+   ulimit -n  # 应 >= 1000000
+   ```
+
+2. **降低连接速率**：
+   ```bash
+   # 使用 --max-cps 限制每秒连接数
+   ./wsbench --max-cps=300 ...
+   ```
+
+3. **增加握手超时**：
+   ```bash
+   ./wsbench --handshake-timeout=60s ...
+   ```
+
+#### Q: 压测时连接中途大量断开？
+
+1. **检查心跳配置**：
+   ```bash
+   # 使用更长的心跳间隔和读超时
+   ./wsbench --ping-interval=45s --read-timeout=120s ...
+   ```
+
+2. **检查服务端资源**：
+   ```bash
+   # 监控 Goroutine 和内存
+   curl http://localhost:8084/metrics | grep go_goroutines
+   curl http://localhost:8084/metrics | grep go_memstats_heap_inuse_bytes
+   ```
+
+3. **查看错误分布**：
+   ```bash
+   ./wsbench --verbose ...  # 查看详细错误
+   ```
+
+#### Q: 每台机器最多能建立多少连接？
+
+受限于本地端口数量，单台机器最多约 **64,000** 个出站连接（端口范围 1024-65535）。
+
+如需超过 64k 连接，需要：
+- 配置多个本地 IP 地址
+- 或使用多台压测机器
+
+#### Q: 服务端能支持多少连接？
+
+理论上 Go 单机可支持百万级连接，实际受限于：
+- 内存：每个连接约 10-20KB
+- CPU：心跳处理和消息分发
+- 文件描述符：需要 `ulimit -n` 足够大
+
+Mac Mini M4 16GB 实测可稳定支持 **30k+** 连接，通过双压测机器可达 **100k+**。
+
+### 环境配置问题
 
 ### Q: 端口被占用怎么办？
 
