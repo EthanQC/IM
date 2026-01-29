@@ -572,10 +572,12 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 	defer pingTicker.Stop()
 
 	// 消息发送 ticker（messaging 模式）
+	var msgTickerCh <-chan time.Time
 	var msgTicker *time.Ticker
 	if cfg.Mode == "messaging" && cfg.MsgRate > 0 {
 		interval := time.Minute / time.Duration(cfg.MsgRate)
 		msgTicker = time.NewTicker(interval)
+		msgTickerCh = msgTicker.C
 		defer msgTicker.Stop()
 	}
 
@@ -591,15 +593,8 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 			return
 		case <-pingTicker.C:
 			sendPing(c, cfg, stats)
-		default:
-			if msgTicker != nil {
-				select {
-				case <-msgTicker.C:
-					sendMessage(c, cfg, stats)
-				default:
-				}
-			}
-			time.Sleep(100 * time.Millisecond)
+		case <-msgTickerCh:
+			sendMessage(c, cfg, stats)
 		}
 	}
 }

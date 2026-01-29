@@ -47,10 +47,11 @@ if [ "$OS" == "macos" ]; then
     # TCP 优化
     sudo sysctl -w net.inet.tcp.msl=15000
     
-    # Socket 缓冲区（服务端需要更大缓冲区处理多连接）
-    sudo sysctl -w kern.ipc.maxsockbuf=33554432
-    sudo sysctl -w net.inet.tcp.sendspace=2097152
-    sudo sysctl -w net.inet.tcp.recvspace=2097152
+    # Socket 缓冲区（macOS 有上限，使用安全值）
+    # 注意：macOS 的 maxsockbuf 有系统限制，不能设置太大
+    sudo sysctl -w kern.ipc.maxsockbuf=16777216 2>/dev/null || echo "maxsockbuf 保持默认值"
+    sudo sysctl -w net.inet.tcp.sendspace=1048576 2>/dev/null || echo "sendspace 保持默认值"
+    sudo sysctl -w net.inet.tcp.recvspace=1048576 2>/dev/null || echo "recvspace 保持默认值"
     
     # launchctl 限制
     sudo launchctl limit maxfiles 1000000 2000000
@@ -60,6 +61,7 @@ if [ "$OS" == "macos" ]; then
     echo "maxfiles: $(sysctl -n kern.maxfiles)"
     echo "maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
     echo "somaxconn: $(sysctl -n kern.ipc.somaxconn)"
+    echo "maxsockbuf: $(sysctl -n kern.ipc.maxsockbuf)"
     echo "launchctl maxfiles: $(launchctl limit maxfiles 2>/dev/null | awk '{print $2, $3}')"
     
 else
