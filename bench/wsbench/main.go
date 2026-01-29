@@ -388,6 +388,17 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 		atomic.AddInt64(&stats.CurrentConns, -1)
 	}()
 
+	// 设置 Ping 处理器 - 服务端发来 Ping 时自动回 Pong
+	c.conn.SetPingHandler(func(appData string) error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.conn == nil {
+			return nil
+		}
+		c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		return c.conn.WriteMessage(websocket.PongMessage, []byte(appData))
+	})
+
 	// 读取消息的 goroutine
 	readDone := make(chan struct{})
 	go func() {
@@ -401,7 +412,8 @@ func runConnection(ctx context.Context, c *Conn, cfg Config, stats *Stats, durat
 				return
 			}
 
-			conn.SetReadDeadline(time.Now().Add(cfg.PingInterval * 2))
+			// 设置读超时为心跳间隔的 3 倍（服务端 pongWait 是 60s）
+			conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {

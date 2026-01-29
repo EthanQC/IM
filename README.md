@@ -755,23 +755,25 @@ cd IM/bench/wsbench
 | 稳定维持时长 | 无大规模断连 | 30min+ |
 | 建连失败率 | 429/5xx/超时/reset | < 1% |
 | 建连延迟 p50/p95/p99 | 握手耗时 | < 100ms |
-| 服务端 FD 使用 | `ls /proc/<pid>/fd \| wc -l` | 记录值 |
+| 服务端 FD 使用 | `lsof -p <PID> \| wc -l` | 记录值 |
 | 服务端内存 | `top` / `htop` | 记录曲线 |
 | GC Pause | pprof 或日志 | < 10ms |
 
 **服务端监控命令**（在 Node-A 执行）：
 
+> ⚠️ **macOS 用户需先安装工具**：`brew install watch htop graphviz`
+
 ```bash
 # 实时连接数
 watch -n 1 'curl -s http://localhost:8084/metrics | grep ws_connections'
 
-# FD 使用（找到 delivery 进程 PID）
-watch -n 5 'ls /proc/$(pgrep -f delivery)/fd | wc -l'
+# FD 使用（macOS 用 lsof，找到 delivery 进程 PID）
+watch -n 5 'lsof -p $(pgrep -f delivery_service) | wc -l'
 
-# 内存和 CPU
-htop
+# 内存和 CPU（macOS 需要 sudo）
+sudo htop
 
-# pprof 分析（压测进行时）
+# pprof 分析（压测进行时，需要 graphviz）
 go tool pprof -http=:8000 http://localhost:8084/debug/pprof/heap
 ```
 
