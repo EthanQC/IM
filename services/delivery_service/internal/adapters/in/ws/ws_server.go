@@ -434,9 +434,10 @@ func (c *EnhancedWSConnection) sendError(msgID, errMsg string) {
 }
 
 // EnhancedConnectionManager 增强版连接管理器
+// 使用分片锁降低锁竞争
 type EnhancedConnectionManager struct {
-	connections map[uint64]map[string]*EnhancedWSConnection // userID -> deviceID -> connection
-	mu          sync.RWMutex
+	// 分片数量 - 使用2的幂次方便位运算
+	shards [256]*connectionShard
 
 	// 统计
 	totalConns int64
@@ -449,10 +450,25 @@ type EnhancedConnectionManager struct {
 	signalingUC in.SignalingUseCase
 }
 
+// connectionShard 连接分片
+type connectionShard struct {
+	connections map[uint64]map[string]*EnhancedWSConnection
+	mu          sync.RWMutex
+}
+
 func NewEnhancedConnectionManager() *EnhancedConnectionManager {
-	return &EnhancedConnectionManager{
-		connections: make(map[uint64]map[string]*EnhancedWSConnection),
+	m := &EnhancedConnectionManager{}
+	for i := 0; i < 256; i++ {
+		m.shards[i] = &connectionShard{
+			connections: make(map[uint64]map[string]*EnhancedWSConnection),
+		}
 	}
+	return m
+}
+
+// getShard 获取用户对应的分片
+func (m *EnhancedConnectionManager) getShard(userID uint64) *connectionShard {
+	return m.shards[userID&255] // 等价于 userID % 256
 }
 
 func (m *EnhancedConnectionManager) SetUseCases(
@@ -468,15 +484,16 @@ func (m *EnhancedConnectionManager) SetUseCases(
 }
 
 func (m *EnhancedConnectionManager) Register(userID uint64, deviceID string, conn out.Connection) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	shard := m.getShard(userID)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
-	if _, ok := m.connections[userID]; !ok {
-		m.connections[userID] = make(map[string]*EnhancedWSConnection)
+	if _, ok := shard.connections[userID]; !ok {
+		shard.connections[userID] = make(map[string]*EnhancedWSConnection)
 	}
 
 	// 关闭旧连接
-	if oldConn, ok := m.connections[userID][deviceID]; ok {
+	if oldConn, ok := shard.connections[userID][deviceID]; ok {
 		oldConn.Close()
 		atomic.AddInt64(&m.totalConns, -1)
 	}
@@ -486,46 +503,50 @@ func (m *EnhancedConnectionManager) Register(userID uint64, deviceID string, con
 		return fmt.Errorf("invalid connection type")
 	}
 
-	m.connections[userID][deviceID] = enhancedConn
-	atomic.AddInt64(&m.totalConns, 1)
+	shard.connections[userID][deviceID] = enhancedConn
+	newTotal := atomic.AddInt64(&m.totalConns, 1)
 
-	zap.L().Info("Connection registered",
-		zap.Uint64("userID", userID),
-		zap.String("deviceID", deviceID),
-		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
+	// 减少日志输出频率 - 只在整千时输出
+	if newTotal%1000 == 0 {
+		zap.L().Info("Connection milestone",
+			zap.Int64("totalConns", newTotal))
+	}
 
 	return nil
 }
 
 func (m *EnhancedConnectionManager) Unregister(userID uint64, deviceID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	shard := m.getShard(userID)
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
-	if devices, ok := m.connections[userID]; ok {
+	if devices, ok := shard.connections[userID]; ok {
 		if conn, ok := devices[deviceID]; ok {
 			conn.Close()
 			delete(devices, deviceID)
-			atomic.AddInt64(&m.totalConns, -1)
+			newTotal := atomic.AddInt64(&m.totalConns, -1)
 
 			if len(devices) == 0 {
-				delete(m.connections, userID)
+				delete(shard.connections, userID)
+			}
+
+			// 减少日志输出频率
+			if newTotal%1000 == 0 {
+				zap.L().Info("Connection milestone",
+					zap.Int64("totalConns", newTotal))
 			}
 		}
 	}
-
-	zap.L().Info("Connection unregistered",
-		zap.Uint64("userID", userID),
-		zap.String("deviceID", deviceID),
-		zap.Int64("totalConns", atomic.LoadInt64(&m.totalConns)))
 
 	return nil
 }
 
 func (m *EnhancedConnectionManager) GetConnections(userID uint64) []out.Connection {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	shard := m.getShard(userID)
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
 
-	devices, ok := m.connections[userID]
+	devices, ok := shard.connections[userID]
 	if !ok {
 		return nil
 	}
@@ -538,10 +559,11 @@ func (m *EnhancedConnectionManager) GetConnections(userID uint64) []out.Connecti
 }
 
 func (m *EnhancedConnectionManager) Send(userID uint64, message []byte) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	shard := m.getShard(userID)
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
 
-	devices, ok := m.connections[userID]
+	devices, ok := shard.connections[userID]
 	if !ok {
 		return nil
 	}
@@ -559,10 +581,11 @@ func (m *EnhancedConnectionManager) Send(userID uint64, message []byte) error {
 }
 
 func (m *EnhancedConnectionManager) SendToDevice(userID uint64, deviceID string, message []byte) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	shard := m.getShard(userID)
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
 
-	devices, ok := m.connections[userID]
+	devices, ok := shard.connections[userID]
 	if !ok {
 		return fmt.Errorf("user not online")
 	}
@@ -585,10 +608,14 @@ func (m *EnhancedConnectionManager) Broadcast(userIDs []uint64, message []byte) 
 
 // GetStats 获取统计信息
 func (m *EnhancedConnectionManager) GetStats() map[string]int64 {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	// 统计在线用户数（遍历所有分片）
+	var userCount int64
+	for i := 0; i < 256; i++ {
+		m.shards[i].mu.RLock()
+		userCount += int64(len(m.shards[i].connections))
+		m.shards[i].mu.RUnlock()
+	}
 
-	userCount := int64(len(m.connections))
 	return map[string]int64{
 		"total_connections": atomic.LoadInt64(&m.totalConns),
 		"total_messages":    atomic.LoadInt64(&m.totalMsgs),
