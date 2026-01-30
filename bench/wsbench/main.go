@@ -243,8 +243,13 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 		progressbar.OptionSetItsString("conn"),
 	)
 
-	// 使用信号量控制并发连接数
-	sem := make(chan struct{}, cfg.MaxConnsPerSecond)
+	// 使用信号量控制并发连接数 - 增大容量避免阻塞
+	// 信号量容量设为 MaxConnsPerSecond * 30，因为连接可能需要最多 30 秒完成
+	semCapacity := cfg.MaxConnsPerSecond * 30
+	if semCapacity < 5000 {
+		semCapacity = 5000
+	}
+	sem := make(chan struct{}, semCapacity)
 
 	// 爬坡建立连接 - 使用批量方式
 	batchSize := int(connsPerSecond / 10) // 每100ms一批
@@ -269,18 +274,22 @@ func runBench(ctx context.Context, cfg Config, stats *Stats) {
 				id := connID
 				connID++
 
+				// 使用非阻塞方式获取信号量，如果满了就直接创建（允许突发）
 				select {
 				case sem <- struct{}{}:
-				case <-ctx.Done():
-					rampDone = true
-					break
+				default:
+					// 信号量满了，直接继续（允许超额并发）
 				}
 
 				wg.Add(1)
 				go func(id int) {
 					defer func() {
 						wg.Done()
-						<-sem
+						// 非阻塞释放信号量
+						select {
+						case <-sem:
+						default:
+						}
 					}()
 					conn := createConnectionWithRetry(ctx, id, cfg, stats)
 					if conn != nil {
