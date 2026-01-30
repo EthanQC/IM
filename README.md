@@ -497,63 +497,77 @@ open http://localhost:8080/swagger
 
 ---
 
-### 部署上云
+### 部署上云 / Docker 一键部署
 
-本项目支持部署到云服务器。以下以 Ubuntu 22.04 为例。
+本项目支持通过 Docker Compose 一键部署全部服务，适用于：
+- 本地压测环境
+- 云服务器生产部署
 
-#### 服务器要求
+#### 服务器要求（云部署）
 
 | 配置 | 最低要求 | 推荐配置 |
 |------|----------|----------|
 | CPU | 2核 | 4核+ |
 | 内存 | 4GB | 8GB+ |
 | 硬盘 | 40GB SSD | 100GB SSD |
-| 系统 | Ubuntu 22.04 | Ubuntu 22.04 LTS |
-| 带宽 | 5Mbps | 10Mbps+ |
+| 系统 | Ubuntu 22.04 / macOS | Linux 推荐 |
 
-#### 一键部署步骤
+#### Docker 一键部署步骤
 
 ```bash
-# 1. SSH 登录服务器
-ssh root@your_server_ip
-
-# 2. 安装 Docker 和 Docker Compose
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-
-# 3. 克隆项目
+# 1. 克隆项目
 git clone https://github.com/EthanQC/IM.git
 cd IM
 
-# 4. 系统调优（高并发必须）
-sudo bash scripts/tune-wsl.sh  # 适用于 Linux，脚本通用
+# 2. 系统调优（高并发必须）
+# macOS:
+sudo bash scripts/tune-macos.sh
+# Linux:
+sudo bash scripts/tune-server.sh
 
-# 5. 启动依赖服务
-make docker-deps-up
+# 3. 启动完整服务栈（首次需要构建镜像，约 3-5 分钟）
+cd deploy
+docker compose -f docker-compose.bench.yml up -d --build
 
-# 6. 初始化数据库
-mysql -h 127.0.0.1 -u root -pimdev < deploy/sql/schema.sql
+# 4. 查看服务状态（等待所有容器 healthy/running）
+docker compose -f docker-compose.bench.yml ps
 
-# 7. 构建并启动服务（推荐使用 systemd 或 supervisor 管理）
-# 方式一：直接运行
-nohup go run services/identity_service/cmd/main.go > /var/log/identity.log 2>&1 &
-nohup go run services/conversation_service/cmd/main.go > /var/log/conversation.log 2>&1 &
-nohup go run services/message_service/cmd/main.go > /var/log/message.log 2>&1 &
-nohup go run services/presence_service/cmd/main.go > /var/log/presence.log 2>&1 &
-nohup go run services/file_service/cmd/main.go > /var/log/file.log 2>&1 &
-nohup go run services/delivery_service/cmd/main.go > /var/log/delivery.log 2>&1 &
-nohup go run services/api_gateway/cmd/main.go services/api_gateway/cmd/handlers.go > /var/log/gateway.log 2>&1 &
+# 5. 初始化数据库
+docker exec -i im_mysql mysql -uroot -pimdev < sql/schema.sql
 
-# 方式二：使用 Docker Compose 生产配置（推荐）
-cp deploy/docker-compose.prod.yml.example deploy/docker-compose.prod.yml
-# 编辑配置后
-docker compose -f deploy/docker-compose.prod.yml up -d
-
-# 8. 验证部署
+# 6. 验证部署
 curl http://localhost:8080/healthz
+curl http://localhost:8084/stats
 ```
 
-#### 防火墙配置
+**服务列表：**
+
+| 服务 | 容器名 | 端口 | 说明 |
+|------|--------|------|------|
+| MySQL | im_mysql | 3306 | root / imdev |
+| Redis | im_redis | 6379 | 无密码 |
+| Kafka | im_kafka | 29092 | KRaft 模式 |
+| MinIO | im_minio | 9000/9001 | admin / admin123 |
+| API Gateway | im_gateway | **8080** | HTTP API |
+| Delivery Service | im_delivery | **8084** | WebSocket |
+
+#### 停止/重启服务
+
+```bash
+# 停止所有服务
+docker compose -f docker-compose.bench.yml down
+
+# 停止并删除数据卷（完全重置）
+docker compose -f docker-compose.bench.yml down -v
+
+# 重启单个服务
+docker compose -f docker-compose.bench.yml restart delivery-service
+
+# 查看日志
+docker compose -f docker-compose.bench.yml logs -f delivery-service
+```
+
+#### 防火墙配置（云服务器）
 
 ```bash
 # 开放必要端口
@@ -582,16 +596,25 @@ sudo certbot --nginx -d your-domain.com
 
 ## 高并发压测
 
-本节提供完整的压测指南，让你在三台本地电脑上进行专业级压测，产出可写入简历的性能数据。
+本节提供完整的压测指南，使用 Docker Compose 部署服务，配合 wsbench 工具进行压测。
 
 ### 压测总原则
 
 > ⚠️ **重要**：在开始前务必阅读
 
-1. **分离测试**：连接压测和消息压测分开跑，否则无法定位瓶颈
-2. **多轮测试**：每个场景至少跑 3 轮（冷启动、热身后、调参后）
-3. **完整记录**：每个场景记录 规模参数 + 成功率 + p95/p99 + 资源曲线 + 队列积压
-4. **区分瓶颈**：区分"服务端瓶颈"和"压测端瓶颈"，WSL2 的网络栈和端口可能先耗尽
+1. **使用 Docker Compose 部署**：所有服务通过容器运行，避免本地环境差异
+2. **分离测试**：连接压测和消息压测分开跑，否则无法定位瓶颈
+3. **多轮测试**：每个场景至少跑 3 轮（冷启动、热身后、调参后）
+4. **完整记录**：每个场景记录 规模参数 + 成功率 + p95/p99 + 资源曲线 + 队列积压
+5. **区分瓶颈**：区分"服务端瓶颈"和"压测端瓶颈"
+
+#### 单机连接数限制
+
+单台机器的出站连接数受限于本地端口范围（通常 1024-65535），即约 **64,000** 个连接。
+
+如需达到 **100k+** 连接，需要：
+- 使用 2+ 台压测机器
+- 或在单机配置多个 IP 地址
 
 #### 硬件拓扑
 
@@ -603,16 +626,13 @@ sudo certbot --nginx -d your-domain.com
                  ▼                     ▼                     ▼
 ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
 │   Node-A (服务节点)      │ │   Node-B (压测节点1)     │ │   Node-C (压测节点2)     │
-│   Mac Mini M4 16G       │ │   i9 + 32G + 4060       │ │   i5 + 32G              │
-│                         │ │   (WSL2 + Ubuntu)       │ │   (WSL2 + Ubuntu)       │
-│ ┌─────────────────────┐ │ │                         │ │                         │
-│ │ Docker Compose      │ │ │ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │
-│ │ MySQL/Redis/Kafka   │ │ │ │ wsbench 压测工具    │ │ │ │ wsbench 压测工具    │ │
-│ └─────────────────────┘ │ │ │ 目标: 50k 连接      │ │ │ │ 目标: 50k 连接      │ │
-│ ┌─────────────────────┐ │ │ └─────────────────────┘ │ │ └─────────────────────┘ │
-│ │ IM 全套微服务        │ │ └─────────────────────────┘ └─────────────────────────┘
-│ └─────────────────────┘ │
-│   IP: 192.168.x.x       │
+│   Mac Mini / Linux      │ │   Linux / WSL2          │ │   Linux / WSL2          │
+│                         │ │                         │ │                         │
+│ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │ │ ┌─────────────────────┐ │
+│ │ Docker Compose      │ │ │ │ wsbench 压测工具    │ │ │ │ wsbench 压测工具    │ │
+│ │ 全套微服务 + 依赖    │ │ │ │ 目标: 50k 连接      │ │ │ │ 目标: 50k 连接      │ │
+│ └─────────────────────┘ │ │ └─────────────────────┘ │ │ └─────────────────────┘ │
+│   IP: 192.168.x.x       │ └─────────────────────────┘ └─────────────────────────┘
 └─────────────────────────┘
 ```
 
@@ -622,7 +642,7 @@ sudo certbot --nginx -d your-domain.com
 
 > ⚠️ **系统调优是高并发的前提**，不调优会遇到假瓶颈（FD 耗尽、端口耗尽、TIME_WAIT 堆积）
 
-#### Step 1: 服务节点准备 (Mac Mini / Linux 服务器)
+#### Step 1: 服务节点准备 (Docker Compose 部署)
 
 ```bash
 # 1. 克隆项目
@@ -630,44 +650,31 @@ git clone https://github.com/EthanQC/IM.git && cd IM
 
 # 2. 系统调优（必须！100k 连接需要调优）
 # macOS:
-sudo bash scripts/tune-server.sh
-
+sudo bash scripts/tune-macos.sh
 # Linux:
 sudo bash scripts/tune-server.sh
-# Linux 调优后需要重新登录使 limits.conf 生效
 
 # 3. 验证调优结果
 ulimit -n                # 应显示 >= 1000000
 sysctl kern.ipc.somaxconn 2>/dev/null || sysctl net.core.somaxconn  # 应显示 >= 65535
 
-# 4. 初始化配置文件
-bash scripts/init-configs.sh
+# 4. 启动完整服务栈（Docker Compose）
+cd deploy
+docker compose -f docker-compose.bench.yml up -d --build
 
-# 5. 启动依赖
-make docker-deps-up
+# 5. 等待所有服务 healthy（约 1-2 分钟）
+docker compose -f docker-compose.bench.yml ps
 
-# 6. 初始化数据库
-docker exec -i im_mysql mysql -uroot -pimdev < deploy/sql/schema.sql
+# 6. 初始化数据库（如果还没有）
+docker exec -i im_mysql mysql -uroot -pimdev < sql/schema.sql
 
-# 7. 启动所有微服务（开 7 个终端或用 tmux）
-# 注意：每个终端都要先设置 ulimit
-ulimit -n 1000000
-
-cd services/identity_service && go run cmd/main.go
-cd services/conversation_service && go run cmd/main.go
-cd services/message_service && go run cmd/main.go
-cd services/presence_service && go run cmd/main.go
-cd services/file_service && go run cmd/main.go
-cd services/delivery_service && go run cmd/main.go  # 关键：WebSocket 服务
-cd services/api_gateway && go run cmd/main.go cmd/handlers.go
-
-# 8. 获取 IP（告知压测节点）
+# 7. 获取 IP（告知压测节点）
 # macOS:
 ipconfig getifaddr en0 || ipconfig getifaddr en1
 # Linux:
 hostname -I | awk '{print $1}'
 
-# 9. 验证服务
+# 8. 验证服务
 curl http://localhost:8080/healthz
 curl http://localhost:8084/stats  # WebSocket 服务状态
 ```
@@ -774,6 +781,11 @@ curl http://$SERVER_IP:8084/stats
 
 **测试目标**：只建立 WebSocket 连接，不发消息，验证稳定维持能力
 
+> ⚠️ **重要参数说明**：
+> - `--max-cps=300`：每秒最大建立 300 个连接，避免服务端处理不过来导致连接被拒绝
+> - `--ping-interval=60s`：与服务端心跳间隔一致
+> - `--read-timeout=180s`：与服务端 pongWait 一致
+
 ```bash
 # ===== 在压测节点执行 =====
 cd IM/bench/wsbench
@@ -785,9 +797,14 @@ ulimit -n 500000
 ./wsbench --target=ws://192.168.1.100:8084/ws --conns=1000 --duration=1m --ramp=10s
 
 # 阶梯压测（找到极限）
-./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=5m --ramp=1m --max-cps=500
-./wsbench --target=ws://192.168.1.100:8084/ws --conns=30000 --duration=10m --ramp=3m --max-cps=500
-./wsbench --target=ws://192.168.1.100:8084/ws --conns=50000 --duration=10m --ramp=5m --max-cps=500
+# 10k 连接 - 约 33 秒建立完成
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=10000 --duration=5m --ramp=1m --max-cps=300 --ping-interval=60s --read-timeout=180s
+
+# 30k 连接 - 约 100 秒建立完成
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=30000 --duration=10m --ramp=2m --max-cps=300 --ping-interval=60s --read-timeout=180s
+
+# 50k 连接 - 约 167 秒建立完成（单机极限）
+./wsbench --target=ws://192.168.1.100:8084/ws --conns=50000 --duration=15m --ramp=5m --max-cps=300 --ping-interval=60s --read-timeout=180s
 
 # ===== 双机联合 100k 目标 =====
 # 使用一键脚本（推荐）：
@@ -804,25 +821,22 @@ bash scripts/run-50k-bench.sh 192.168.1.100:8084
     --conns=50000 \
     --duration=30m \
     --ramp=5m \
-    --ping-interval=45s \
+    --ping-interval=60s \
     --handshake-timeout=30s \
-    --max-cps=500 \
+    --max-cps=300 \
     --retry=3 \
     --retry-delay=2s \
-    --read-timeout=120s
+    --read-timeout=180s
 
 # Node-C 同时执行相同命令
 ```
 
-**实时监控（在 Node-A 执行）**：
+**实时监控（在服务节点执行）**：
 
 ```bash
-# 方法一：使用监控脚本（推荐）
+# 使用监控脚本
 bash scripts/monitor-bench.sh localhost:8084
-
-# 方法二：手动监控
-# 终端1: 连接数
-watch -n 1 'curl -s http://localhost:8084/stats'
+```
 
 # 终端2: Goroutine 数量
 watch -n 1 'curl -s http://localhost:8084/metrics | grep go_goroutines'

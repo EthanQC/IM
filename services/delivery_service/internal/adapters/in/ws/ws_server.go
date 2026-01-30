@@ -18,19 +18,19 @@ import (
 
 const (
 	// 写超时
-	writeWait = 10 * time.Second
-	// Pong等待时间 - 增加到120秒以适应高并发
-	pongWait = 120 * time.Second
-	// Ping周期（必须小于pongWait）- 使用45秒给客户端更多响应时间
-	pingPeriod = 45 * time.Second
+	writeWait = 15 * time.Second
+	// Pong等待时间 - 增加到180秒以适应高并发
+	pongWait = 180 * time.Second
+	// Ping周期（必须小于pongWait）- 使用60秒给客户端更多响应时间
+	pingPeriod = 60 * time.Second
 	// 最大消息大小
 	maxMessageSize = 64 * 1024
 	// 心跳超时
-	heartbeatTimeout = 150 * time.Second
+	heartbeatTimeout = 240 * time.Second
 	// 重连检测间隔
 	reconnectCheckInterval = 5 * time.Second
 	// 发送缓冲区大小 - 增大以避免阻塞
-	sendBufferSize = 512
+	sendBufferSize = 1024
 )
 
 // WSMessageType WebSocket消息类型

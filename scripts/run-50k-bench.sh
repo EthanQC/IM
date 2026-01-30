@@ -14,8 +14,10 @@ SERVER="${1:-localhost:8084}"
 USER_OFFSET="${2:-0}"
 CONNS=50000
 RAMP="5m"
-DURATION="10m"
-PING_INTERVAL="45s"
+DURATION="15m"
+PING_INTERVAL="60s"
+MAX_CPS=300
+READ_TIMEOUT="180s"
 
 # 颜色
 RED='\033[0;31m'
@@ -132,11 +134,11 @@ echo ""
     --handshake-timeout=30s \
     --read-buffer=8192 \
     --write-buffer=8192 \
-    --max-cps=500 \
+    --max-cps="$MAX_CPS" \
     --retry=3 \
     --retry-delay=2s \
-    --read-timeout=120s \
-    --write-timeout=10s \
+    --read-timeout="$READ_TIMEOUT" \
+    --write-timeout=15s \
     --output=text 2>&1 | tee -a "$RESULT_FILE"
 
 # 6. 记录最终状态

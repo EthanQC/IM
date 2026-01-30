@@ -1,0 +1,31 @@
+# File Service Docker/生产环境配置
+
+server:
+  http_port: 8085
+  grpc_port: 9085
+  callback_url: "http://file-service:8085/callback/upload"
+  mode: release
+
+grpc:
+  message_addr: "message-service:9082"
+
+mysql:
+  dsn: "root:imdev@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 20
+  max_open_conns: 200
+
+minio:
+  endpoint: "minio:9000"
+  access_key: "admin"
+  secret_key: "admin123"
+  use_ssl: false
+  bucket: "im-files"
+  region: "us-east-1"
+
+log:
+  service: "file-service"
+  level: info
+  encoding: json
+  stdout: true
+  file:
+    path: ""

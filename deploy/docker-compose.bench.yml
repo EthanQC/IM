@@ -1,0 +1,259 @@
+# IM 本地压测环境 Docker Compose
+# 包含基础设施 + 全部微服务，用于本地压测
+# 使用方法: docker compose -f docker-compose.bench.yml up -d
+
+services:
+  # ==================== 基础设施 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: im_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: imdev
+      MYSQL_DATABASE: im_db
+    command: 
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=1000
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - im_network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: im_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes", "--maxclients", "100000"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - im_network
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: im_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://host.docker.internal:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - im_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: im_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - im_network
+
+  # ==================== 微服务 ====================
+  identity-service:
+    build:
+      context: ..
+      dockerfile: services/identity_service/Dockerfile
+    container_name: im_identity
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    volumes:
+      - ./configs/identity.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+    networks:
+      - im_network
+
+  conversation-service:
+    build:
+      context: ..
+      dockerfile: services/conversation_service/Dockerfile
+    container_name: im_conversation
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    volumes:
+      - ./configs/conversation.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  message-service:
+    build:
+      context: ..
+      dockerfile: services/message_service/Dockerfile
+    container_name: im_message
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    volumes:
+      - ./configs/message.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  presence-service:
+    build:
+      context: ..
+      dockerfile: services/presence_service/Dockerfile
+    container_name: im_presence
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    volumes:
+      - ./configs/presence.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  file-service:
+    build:
+      context: ..
+      dockerfile: services/file_service/Dockerfile
+    container_name: im_file
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    volumes:
+      - ./configs/file.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - im_network
+
+  # Delivery Service - WebSocket 服务（压测重点）
+  delivery-service:
+    build:
+      context: ..
+      dockerfile: services/delivery_service/Dockerfile
+    container_name: im_delivery
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+      - GOMAXPROCS=4
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./configs/delivery.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    networks:
+      - im_network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api_gateway/Dockerfile
+    container_name: im_gateway
+    restart: unless-stopped
+    environment:
+      - APP_ENV=prod
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./configs/gateway.prod.yaml:/app/configs/config.prod.yaml:ro
+    depends_on:
+      - identity-service
+      - conversation-service
+      - message-service
+      - presence-service
+      - file-service
+      - delivery-service
+    networks:
+      - im_network
+
+volumes:
+  mysql_data:
+  redis_data:
+  kafka_data:
+  minio_data:
+
+networks:
+  im_network:
+    name: im_network
+    driver: bridge
