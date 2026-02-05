@@ -4,11 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/EthanQC/IM/services/message_service/internal/domain/entity"
 	"github.com/EthanQC/IM/services/message_service/internal/ports/in"
 	"github.com/EthanQC/IM/services/message_service/internal/ports/out"
+)
+
+const (
+	// inboxConcurrencyLimit 写扩散时更新收件箱的并发限制
+	// 避免瞬时大量 Redis 请求压垮服务
+	inboxConcurrencyLimit = 50
 )
 
 // EnhancedMessageUseCaseImpl 增强版消息用例实现
@@ -114,26 +121,10 @@ func (uc *EnhancedMessageUseCaseImpl) SendMessage(ctx context.Context, req *in.S
 		}
 	}
 
-	// 更新收件箱
-	for _, memberID := range memberIDs {
-		if _, err := uc.inboxRepo.GetOrCreate(ctx, memberID, req.ConversationID); err != nil {
-			return nil, fmt.Errorf("ensure inbox: %w", err)
-		}
-		if err := uc.inboxRepo.UpdateLastDelivered(ctx, memberID, req.ConversationID, seq); err != nil {
-			return nil, fmt.Errorf("update delivered seq: %w", err)
-		}
-		if memberID == req.SenderID {
-			if err := uc.inboxRepo.UpdateLastRead(ctx, memberID, req.ConversationID, seq); err != nil {
-				return nil, fmt.Errorf("update read seq: %w", err)
-			}
-			if err := uc.inboxRepo.ClearUnread(ctx, memberID, req.ConversationID); err != nil {
-				return nil, fmt.Errorf("clear unread: %w", err)
-			}
-			continue
-		}
-		if err := uc.inboxRepo.IncrUnread(ctx, memberID, req.ConversationID, 1); err != nil {
-			return nil, fmt.Errorf("incr unread: %w", err)
-		}
+	// 更新收件箱（写扩散模型）
+	// 使用信号量控制并发，避免大群场景下瞬时压垮 Redis
+	if err := uc.updateInboxesConcurrently(ctx, memberIDs, req.SenderID, req.ConversationID, seq); err != nil {
+		return nil, err
 	}
 
 	// 发布消息发送事件到Kafka
@@ -311,4 +302,74 @@ func (uc *EnhancedMessageUseCaseImpl) DeleteMessage(ctx context.Context, userID,
 // GetUnreadCount 获取未读数
 func (uc *EnhancedMessageUseCaseImpl) GetUnreadCount(ctx context.Context, userID, conversationID uint64) (int, error) {
 	return uc.inboxRepo.GetUnreadCount(ctx, userID, conversationID)
+}
+
+// updateInboxesConcurrently 并发更新收件箱（写扩散模型的核心实现）
+// 使用 semaphore 控制并发数，避免大群场景下瞬时压垮 Redis
+// 对发送者和接收者使用不同的更新逻辑，通过 Lua 脚本保证原子性
+func (uc *EnhancedMessageUseCaseImpl) updateInboxesConcurrently(
+	ctx context.Context,
+	memberIDs []uint64,
+	senderID uint64,
+	conversationID uint64,
+	seq uint64,
+) error {
+	var (
+		wg      sync.WaitGroup
+		errChan = make(chan error, len(memberIDs))
+		sem     = make(chan struct{}, inboxConcurrencyLimit) // 并发限制：50
+	)
+
+	for _, memberID := range memberIDs {
+		wg.Add(1)
+		go func(mid uint64) {
+			defer wg.Done()
+
+			// 获取信号量
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// 确保收件箱存在
+			if _, err := uc.inboxRepo.GetOrCreate(ctx, mid, conversationID); err != nil {
+				errChan <- fmt.Errorf("ensure inbox for user %d: %w", mid, err)
+				return
+			}
+
+			if mid == senderID {
+				// 发送者：更新投递位置（不增加未读数）+ 更新已读位置 + 清除未读数
+				if err := uc.inboxRepo.UpdateLastDelivered(ctx, mid, conversationID, seq); err != nil {
+					errChan <- fmt.Errorf("update delivered seq for sender: %w", err)
+					return
+				}
+				if err := uc.inboxRepo.UpdateLastRead(ctx, mid, conversationID, seq); err != nil {
+					errChan <- fmt.Errorf("update read seq: %w", err)
+					return
+				}
+				if err := uc.inboxRepo.ClearUnread(ctx, mid, conversationID); err != nil {
+					errChan <- fmt.Errorf("clear unread: %w", err)
+					return
+				}
+			} else {
+				// 接收者：使用 UpdateLastDeliveredForReceiver 原子更新投递位置并增加未读数
+				// Lua 脚本保证原子性，避免并发竞态条件，不再单独调用 IncrUnread
+				if err := uc.inboxRepo.UpdateLastDeliveredForReceiver(ctx, mid, conversationID, seq); err != nil {
+					errChan <- fmt.Errorf("update delivered seq for receiver %d: %w", mid, err)
+					return
+				}
+			}
+		}(memberID)
+	}
+
+	// 等待所有 goroutine 完成
+	wg.Wait()
+	close(errChan)
+
+	// 收集错误（返回第一个错误）
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

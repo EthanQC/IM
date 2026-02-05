@@ -93,12 +93,12 @@ if not data then
 else
     inbox = cjson.decode(data)
     local old_delivered_seq = inbox.last_delivered_seq or 0
-    
+
     if new_delivered_seq > old_delivered_seq then
         inbox.last_delivered_seq = new_delivered_seq
         inbox.last_msg_seq = new_delivered_seq
         inbox.last_msg_time = msg_time
-        
+
         -- 如果不是自己发的消息，增加未读数
         if is_self == 0 then
             inbox.unread_count = (inbox.unread_count or 0) + 1
@@ -111,6 +111,45 @@ redis.call('HSET', inbox_key, conv_id, cjson.encode(inbox))
 redis.call('ZADD', convlist_key, msg_time, conv_id)
 
 return inbox.unread_count
+`)
+
+// Lua脚本：原子性增加未读数（解决并发竞态条件）
+var incrUnreadScript = redis.NewScript(`
+local inbox_key = KEYS[1]
+local conv_id = ARGV[1]
+local delta = tonumber(ARGV[2])
+
+local data = redis.call('HGET', inbox_key, conv_id)
+if not data then
+    return 0
+end
+
+local inbox = cjson.decode(data)
+local new_count = (inbox.unread_count or 0) + delta
+if new_count < 0 then
+    new_count = 0
+end
+inbox.unread_count = new_count
+
+redis.call('HSET', inbox_key, conv_id, cjson.encode(inbox))
+return new_count
+`)
+
+// Lua脚本：原子性清除未读数（解决并发竞态条件）
+var clearUnreadScript = redis.NewScript(`
+local inbox_key = KEYS[1]
+local conv_id = ARGV[1]
+
+local data = redis.call('HGET', inbox_key, conv_id)
+if not data then
+    return 0
+end
+
+local inbox = cjson.decode(data)
+inbox.unread_count = 0
+
+redis.call('HSET', inbox_key, conv_id, cjson.encode(inbox))
+return 0
 `)
 
 // InboxRepositoryRedis Redis收件箱仓储实现
@@ -208,7 +247,8 @@ func (r *InboxRepositoryRedis) UpdateLastRead(ctx context.Context, userID, conve
 	return nil
 }
 
-// UpdateLastDelivered 更新投递位置
+// UpdateLastDelivered 更新投递位置（发送者调用，不增加未读数）
+// is_self=1 表示是发送者，Lua脚本不会增加未读数
 func (r *InboxRepositoryRedis) UpdateLastDelivered(ctx context.Context, userID, conversationID, deliveredSeq uint64) error {
 	inboxKey := r.getInboxKey(userID)
 	convListKey := r.getConvListKey(userID)
@@ -217,7 +257,7 @@ func (r *InboxRepositoryRedis) UpdateLastDelivered(ctx context.Context, userID, 
 
 	_, err := updateDeliveredSeqScript.Run(ctx, r.client,
 		[]string{inboxKey, convListKey},
-		convIDStr, deliveredSeq, msgTime, 1).Result() // 1 表示是自己发的
+		convIDStr, deliveredSeq, msgTime, 1).Result() // 1 = is_self, 不增加未读
 	if err != nil && err != redis.Nil {
 		return fmt.Errorf("update delivered seq failed: %w", err)
 	}
@@ -225,8 +265,9 @@ func (r *InboxRepositoryRedis) UpdateLastDelivered(ctx context.Context, userID, 
 	return nil
 }
 
-// UpdateLastDeliveredWithUnread 更新投递位置并增加未读数（非发送者调用）
-func (r *InboxRepositoryRedis) UpdateLastDeliveredWithUnread(ctx context.Context, userID, conversationID, deliveredSeq uint64) error {
+// UpdateLastDeliveredForReceiver 更新投递位置并原子增加未读数（接收者调用）
+// is_self=0 表示是接收者，Lua脚本会原子增加未读数
+func (r *InboxRepositoryRedis) UpdateLastDeliveredForReceiver(ctx context.Context, userID, conversationID, deliveredSeq uint64) error {
 	inboxKey := r.getInboxKey(userID)
 	convListKey := r.getConvListKey(userID)
 	convIDStr := strconv.FormatUint(conversationID, 10)
@@ -234,71 +275,46 @@ func (r *InboxRepositoryRedis) UpdateLastDeliveredWithUnread(ctx context.Context
 
 	_, err := updateDeliveredSeqScript.Run(ctx, r.client,
 		[]string{inboxKey, convListKey},
-		convIDStr, deliveredSeq, msgTime, 0).Result() // 0 表示不是自己发的
+		convIDStr, deliveredSeq, msgTime, 0).Result() // 0 = is_receiver, 原子增加未读
 	if err != nil && err != redis.Nil {
-		return fmt.Errorf("update delivered seq with unread failed: %w", err)
+		return fmt.Errorf("update delivered seq for receiver failed: %w", err)
 	}
 
 	return nil
 }
 
-// IncrUnread 增加未读数
+// UpdateLastDeliveredWithUnread 更新投递位置并增加未读数（已废弃，请使用UpdateLastDeliveredForReceiver）
+// Deprecated: Use UpdateLastDeliveredForReceiver instead
+func (r *InboxRepositoryRedis) UpdateLastDeliveredWithUnread(ctx context.Context, userID, conversationID, deliveredSeq uint64) error {
+	return r.UpdateLastDeliveredForReceiver(ctx, userID, conversationID, deliveredSeq)
+}
+
+// IncrUnread 原子增加未读数（使用Lua脚本保证并发安全）
+// 解决了之前 HGET -> 修改 -> HSET 的竞态条件问题
 func (r *InboxRepositoryRedis) IncrUnread(ctx context.Context, userID, conversationID uint64, delta int) error {
 	key := r.getInboxKey(userID)
 	convIDStr := strconv.FormatUint(conversationID, 10)
 
-	data, err := r.client.HGet(ctx, key, convIDStr).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil
-		}
-		return fmt.Errorf("get inbox failed: %w", err)
+	_, err := incrUnreadScript.Run(ctx, r.client, []string{key}, convIDStr, delta).Result()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("incr unread failed: %w", err)
 	}
 
-	var item InboxCacheItem
-	if err := json.Unmarshal([]byte(data), &item); err != nil {
-		return fmt.Errorf("unmarshal inbox failed: %w", err)
-	}
-
-	item.UnreadCount += delta
-	if item.UnreadCount < 0 {
-		item.UnreadCount = 0
-	}
-
-	newData, err := json.Marshal(item)
-	if err != nil {
-		return fmt.Errorf("marshal inbox failed: %w", err)
-	}
-
-	return r.client.HSet(ctx, key, convIDStr, string(newData)).Err()
+	return nil
 }
 
-// ClearUnread 清除未读数
+// ClearUnread 原子清除未读数（使用Lua脚本保证并发安全）
+// 解决了之前 HGET -> 修改 -> HSET 的竞态条件问题
 func (r *InboxRepositoryRedis) ClearUnread(ctx context.Context, userID, conversationID uint64) error {
 	key := r.getInboxKey(userID)
 	convIDStr := strconv.FormatUint(conversationID, 10)
 
-	data, err := r.client.HGet(ctx, key, convIDStr).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil
-		}
-		return fmt.Errorf("get inbox failed: %w", err)
+	_, err := clearUnreadScript.Run(ctx, r.client, []string{key}, convIDStr).Result()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("clear unread failed: %w", err)
 	}
 
-	var item InboxCacheItem
-	if err := json.Unmarshal([]byte(data), &item); err != nil {
-		return fmt.Errorf("unmarshal inbox failed: %w", err)
-	}
-
-	item.UnreadCount = 0
-
-	newData, err := json.Marshal(item)
-	if err != nil {
-		return fmt.Errorf("marshal inbox failed: %w", err)
-	}
-
-	return r.client.HSet(ctx, key, convIDStr, string(newData)).Err()
+	return nil
 }
 
 // GetUnreadCount 获取未读数

@@ -326,6 +326,18 @@ func (r *InboxRepositoryMySQL) UpdateLastDelivered(ctx context.Context, userID, 
 		Update("last_delivered_seq", deliveredSeq).Error
 }
 
+// UpdateLastDeliveredForReceiver 更新投递位置并原子增加未读数（接收者调用）
+// 使用单条 SQL 语句同时更新两个字段，保证原子性
+func (r *InboxRepositoryMySQL) UpdateLastDeliveredForReceiver(ctx context.Context, userID, conversationID, deliveredSeq uint64) error {
+	return r.db.WithContext(ctx).
+		Model(&InboxModel{}).
+		Where("user_id = ? AND conversation_id = ?", userID, conversationID).
+		Updates(map[string]interface{}{
+			"last_delivered_seq": deliveredSeq,
+			"unread_count":       gorm.Expr("unread_count + 1"),
+		}).Error
+}
+
 func (r *InboxRepositoryMySQL) IncrUnread(ctx context.Context, userID, conversationID uint64, delta int) error {
 	return r.db.WithContext(ctx).
 		Model(&InboxModel{}).

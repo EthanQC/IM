@@ -47,13 +47,16 @@ type InboxRepository interface {
 	// UpdateLastRead 更新已读位置
 	UpdateLastRead(ctx context.Context, userID, conversationID, readSeq uint64) error
 
-	// UpdateLastDelivered 更新投递位置
+	// UpdateLastDelivered 更新投递位置（发送者调用，不增加未读数）
 	UpdateLastDelivered(ctx context.Context, userID, conversationID, deliveredSeq uint64) error
 
-	// IncrUnread 增加未读数
+	// UpdateLastDeliveredForReceiver 更新投递位置并原子增加未读数（接收者调用）
+	UpdateLastDeliveredForReceiver(ctx context.Context, userID, conversationID, deliveredSeq uint64) error
+
+	// IncrUnread 原子增加未读数（Lua脚本保证原子性）
 	IncrUnread(ctx context.Context, userID, conversationID uint64, delta int) error
 
-	// ClearUnread 清除未读数
+	// ClearUnread 原子清除未读数（Lua脚本保证原子性）
 	ClearUnread(ctx context.Context, userID, conversationID uint64) error
 
 	// GetUnreadCount 获取未读数
