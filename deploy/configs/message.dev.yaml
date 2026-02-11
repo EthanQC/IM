@@ -1,0 +1,36 @@
+# Message Service 本地开发配置（Docker 网络）
+server:
+  http_port: 8083
+  grpc_port: 9082
+  mode: debug
+
+grpc:
+  conversation_addr: "conversation-service:9081"
+  timeout: 3s
+
+mysql:
+  dsn: "root:imdev@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+  max_idle_conns: 50
+  max_open_conns: 200
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+  pool_size: 200
+
+kafka:
+  brokers:
+    - "kafka:9092"
+  topics:
+    message_new: "im.message.new"
+    message_read: "im.message.read"
+    message_revoked: "im.message.revoked"
+
+log:
+  service: "message-service"
+  level: debug
+  encoding: console
+  stdout: true
+  file:
+    path: ""

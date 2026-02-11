@@ -18,10 +18,10 @@ import (
 // AuthServer implements the shared IdentityService proto for MVP.
 type AuthServer struct {
 	imv1.UnimplementedIdentityServiceServer
-	AuthUC in.AuthUseCase
-	UserUC in.UserUseCase
+	AuthUC    in.AuthUseCase
+	UserUC    in.UserUseCase
 	ContactUC in.ContactUseCase
-	SMSUC  in.SMSUseCase
+	SMSUC     in.SMSUseCase
 }
 
 func NewAuthServer(authUC in.AuthUseCase, userUC in.UserUseCase, contactUC in.ContactUseCase, smsUC in.SMSUseCase) *AuthServer {
@@ -38,17 +38,7 @@ func (s *AuthServer) Register(ctx context.Context, req *imv1.RegisterRequest) (*
 	// 注册成功后自动登录获取 token
 	at, err := s.AuthUC.LoginByPassword(ctx, req.Username, req.Password)
 	if err != nil {
-		// 注册成功但登录失败，返回用户信息但没有 token
-		return &imv1.AuthResponse{
-			Profile: &imv1.UserProfile{
-				User: &imv1.UserBrief{
-					Id:          int64(user.ID),
-					Username:    user.Username,
-					DisplayName: user.DisplayName,
-				},
-				Status: "active",
-			},
-		}, nil
+		return nil, status.Errorf(codes.Internal, "register succeeded but login failed: %v", err)
 	}
 
 	return &imv1.AuthResponse{

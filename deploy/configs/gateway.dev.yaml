@@ -1,5 +1,4 @@
-# API Gateway Docker/生产环境配置
-
+# API Gateway 本地开发配置（Docker 网络）
 server:
   http_port: 8080
   grpc_addr_identity: "identity-service:9080"
@@ -13,12 +12,12 @@ server:
   write_timeout: 30s
 
 jwt:
-  secret: "bench-jwt-secret-key-at-least-32-characters"
+  secret: "dev-jwt-secret-key-at-least-32-characters"
 
 log:
   service: "api-gateway"
-  level: info
-  encoding: json
+  level: debug
+  encoding: console
   stdout: true
   file:
     path: ""

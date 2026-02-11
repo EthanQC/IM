@@ -1,0 +1,17 @@
+# Presence Service 本地开发配置（Docker 网络）
+server:
+  grpc_port: 9084
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+  pool_size: 200
+
+log:
+  service: "presence-service"
+  level: debug
+  encoding: console
+  stdout: true
+  file:
+    path: ""

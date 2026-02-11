@@ -1,0 +1,20 @@
+# Conversation Service 本地开发配置（Docker 网络）
+server:
+  http_port: 8082
+  grpc_port: 9081
+
+mysql:
+  dsn: "root:imdev@tcp(mysql:3306)/im_db?charset=utf8mb4&parseTime=True&loc=Local"
+
+redis:
+  addr: "redis:6379"
+  password: ""
+  db: 0
+
+log:
+  service: "conversation-service"
+  level: debug
+  encoding: console
+  stdout: true
+  file:
+    path: ""

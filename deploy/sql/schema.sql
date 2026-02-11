@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS blacklist (
     CONSTRAINT fk_blacklist_blocked FOREIGN KEY (blocked_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单表';
 
+-- 用户封禁状态表
+CREATE TABLE IF NOT EXISTS user_block_statuses (
+    user_id VARCHAR(64) PRIMARY KEY COMMENT '用户ID',
+    is_blocked TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否封禁: 0=否,1=是',
+    block_reason VARCHAR(255) NOT NULL DEFAULT '' COMMENT '封禁原因',
+    blocked_at DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00' COMMENT '封禁时间',
+    block_expire_at DATETIME NOT NULL DEFAULT '1970-01-01 00:00:00' COMMENT '封禁过期时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_is_blocked (is_blocked),
+    KEY idx_block_expire_at (block_expire_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户封禁状态表';
+
 -- 刷新令牌表
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id VARCHAR(64) PRIMARY KEY COMMENT 'token id/jti',
