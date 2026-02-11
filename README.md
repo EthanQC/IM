@@ -1352,3 +1352,75 @@ MIT License
 ---
 
 **⭐ 如果这个项目对你有帮助，请给一个 Star~ 谢谢～**
+
+---
+
+## 前端（web/chat-server）
+
+### 技术栈
+
+- Vue 3 + TypeScript
+- Vite 5
+- Pinia + Vue Router
+- Axios
+
+### 目录
+
+- 前端工程路径：`web/chat-server`
+
+### 本地启动（前后端联调）
+
+1. 启动后端（Docker，dev 环境）
+
+```bash
+cd deploy
+docker compose -f docker-compose.bench.yml up -d --build
+```
+
+2. 启动前端
+
+```bash
+cd web/chat-server
+npm install
+npm run dev
+```
+
+3. 打开页面
+
+- [http://127.0.0.1:5173](http://127.0.0.1:5173)
+
+### 前端环境变量
+
+可参考 `web/chat-server/.env.example`，默认即可本地联调：
+
+- `VITE_API_BASE_URL=/api`
+- `VITE_WS_BASE_URL=/ws`
+- `VITE_API_PROXY_TARGET=http://127.0.0.1:8080`
+- `VITE_WS_PROXY_TARGET=ws://127.0.0.1:8084`
+
+### 可用命令
+
+```bash
+cd web/chat-server
+npm run dev
+npm run typecheck
+npm run build
+npm run preview
+```
+
+### 功能覆盖说明
+
+当前前端已接入并验证以下后端能力：
+
+- 注册、登录、Token 刷新、个人资料查询/更新
+- 联系人申请、处理、列表、删除
+- 会话创建、列表、详情、更新
+- 消息发送、历史拉取、已读上报、撤回
+- 在线状态查询
+- 文件上传（创建上传票据、直传对象存储、完成上传）
+- WebSocket 实时消息、ACK、已读事件、撤回事件
+- 音视频信令流程（呼叫、接听、拒绝、挂断、offer/answer/ice candidate）
+
+### 说明
+
+- 本地 Docker dev 配置下，文件服务使用 `host.docker.internal:9000` 生成预签名上传地址，确保浏览器可直接上传。
