@@ -154,7 +154,7 @@ input {
 }
 
 input:focus {
-  outline: 2px solid #ffcade;
+  outline: 2px solid rgba(7, 193, 96, 0.35);
   outline-offset: 1px;
 }
 
@@ -163,7 +163,7 @@ input:focus {
   height: 44px;
   border-radius: var(--radius-sm);
   border: none;
-  background: linear-gradient(120deg, #f7a8c6, #f18ab2);
+  background: linear-gradient(120deg, #15c86b, #08b75b);
   color: #fff;
   font-weight: 600;
   cursor: pointer;

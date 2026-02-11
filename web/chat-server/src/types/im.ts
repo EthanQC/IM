@@ -20,7 +20,7 @@ export interface AuthPayload {
 export interface ConversationBrief {
   id: number;
   type: number;
-  title: string;
+  title?: string;
 }
 
 export interface PresenceItem {

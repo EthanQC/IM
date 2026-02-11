@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --bg: #fff8fb;
-  --bg-soft: #fff1f6;
-  --surface: #ffffffcc;
+  --bg: #f2f2f2;
+  --bg-soft: #ebebeb;
+  --surface: #ffffffee;
   --surface-strong: #ffffff;
-  --text: #2b1f27;
-  --text-soft: #6b5563;
-  --border: #f1dce7;
-  --primary: #f59bbc;
-  --primary-strong: #e96aa0;
-  --danger: #d14d73;
-  --shadow: 0 18px 45px -24px rgba(218, 118, 157, 0.45);
+  --text: #1f1f1f;
+  --text-soft: #6f6f6f;
+  --border: #d9d9d9;
+  --primary: #07c160;
+  --primary-strong: #06ad56;
+  --danger: #d94a45;
+  --shadow: 0 14px 36px -24px rgba(0, 0, 0, 0.24);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -28,11 +28,7 @@ body,
   margin: 0;
   font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at 12% 8%, #ffeef7 0%, transparent 40%),
-    radial-gradient(circle at 88% 18%, #ffe8f2 0%, transparent 36%),
-    radial-gradient(circle at 82% 92%, #ffebf4 0%, transparent 35%),
-    var(--bg);
+  background: var(--bg);
 }
 
 button,

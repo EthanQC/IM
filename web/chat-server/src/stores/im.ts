@@ -54,13 +54,6 @@ interface ActiveCall {
   turnServers: Array<{ urls: string[]; username?: string; credential?: string }>;
 }
 
-function parseIDList(text: string): number[] {
-  return text
-    .split(/[，,\s]+/)
-    .map((item) => Number(item.trim()))
-    .filter((item) => Number.isFinite(item) && item > 0);
-}
-
 function inferUploadKind(file: File): UploadKind {
   if (file.type.startsWith("image/")) {
     return "image";
@@ -75,14 +68,23 @@ function inferUploadKind(file: File): UploadKind {
 }
 
 function makeDeviceID(): string {
-  const key = "im.device_id";
-  const existing = localStorage.getItem(key);
-  if (existing) {
-    return existing;
+  const installKey = "im.installation_id";
+  const runtimeKey = "__im_runtime_device_id";
+  const runtime = (window as unknown as Record<string, string | undefined>)[runtimeKey];
+
+  if (runtime) {
+    return runtime;
   }
 
-  const next = `web-${nanoid(12)}`;
-  localStorage.setItem(key, next);
+  let installationID = localStorage.getItem(installKey);
+  if (!installationID) {
+    installationID = `app-${nanoid(8)}`;
+    localStorage.setItem(installKey, installationID);
+  }
+
+  // 每个页面实例独立 device_id，避免同账号多窗口（含复制标签页）互相顶掉连接。
+  const next = `web-${installationID}-${nanoid(6)}`;
+  (window as unknown as Record<string, string | undefined>)[runtimeKey] = next;
   return next;
 }
 
@@ -307,24 +309,24 @@ export const useIMStore = defineStore("im", () => {
   async function createConversation(input: {
     type: 1 | 2;
     title?: string;
-    memberIDsText: string;
-  }): Promise<void> {
+    memberIDs: number[];
+  }): Promise<ConversationBrief> {
     resetError();
 
     try {
-      const memberIDs = parseIDList(input.memberIDsText);
-      if (!memberIDs.length) {
+      if (!input.memberIDs.length) {
         throw new Error("至少填写一个成员ID");
       }
 
       const conversation = await apiCreateConversation({
         type: input.type,
         title: input.title,
-        member_ids: memberIDs,
+        member_ids: input.memberIDs,
       });
 
       upsertConversation(conversation);
       await openConversation(conversation.id);
+      return conversation;
     } catch (error) {
       setError(error);
       throw error;
@@ -355,7 +357,7 @@ export const useIMStore = defineStore("im", () => {
   async function startSingleChatWithUser(targetUserId: number): Promise<void> {
     await createConversation({
       type: 1,
-      memberIDsText: String(targetUserId),
+      memberIDs: [targetUserId],
     });
   }
 
@@ -693,18 +695,37 @@ export const useIMStore = defineStore("im", () => {
     };
   }
 
-  async function ensureLocalStream(callType: CallMediaType): Promise<MediaStream> {
+  async function ensureLocalStream(callType: CallMediaType): Promise<MediaStream | null> {
     if (localStream.value) {
       return localStream.value;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: callType === "video",
-    });
+    // 优先使用完整媒体能力；若本机无设备则降级为仅接收模式，避免通话流程直接失败。
+    const candidates: MediaStreamConstraints[] =
+      callType === "video"
+        ? [
+            { audio: true, video: true },
+            { audio: true, video: false },
+            { audio: false, video: true },
+          ]
+        : [{ audio: true, video: false }];
 
-    localStream.value = stream;
-    return stream;
+    let lastError: unknown = null;
+    for (const constraints of candidates) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStream.value = stream;
+        return stream;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (lastError) {
+      callError.value = toErrorMessage(lastError);
+    }
+
+    return null;
   }
 
   function stopLocalStream(): void {
@@ -771,9 +792,16 @@ export const useIMStore = defineStore("im", () => {
     };
 
     const stream = await ensureLocalStream(call.callType);
-    stream.getTracks().forEach((track) => {
-      connection.addTrack(track, stream);
-    });
+    if (stream && stream.getTracks().length > 0) {
+      stream.getTracks().forEach((track) => {
+        connection.addTrack(track, stream);
+      });
+    } else {
+      connection.addTransceiver("audio", { direction: "recvonly" });
+      if (call.callType === "video") {
+        connection.addTransceiver("video", { direction: "recvonly" });
+      }
+    }
 
     peerConnection.value = connection;
     return connection;
@@ -830,8 +858,6 @@ export const useIMStore = defineStore("im", () => {
 
       activeCall.value = call;
       callPhase.value = "outgoing";
-
-      await ensureLocalStream(callType);
     } catch (error) {
       callError.value = toErrorMessage(error);
       throw error;
@@ -1136,7 +1162,6 @@ export const useIMStore = defineStore("im", () => {
     disconnectRealtime,
     formatReadTip,
     formatConversationSubtitle,
-    parseIDList,
     toFileURL,
     initiateCall,
     acceptIncomingCall,

@@ -98,6 +98,15 @@ export class IMWebSocketClient {
           return;
         }
 
+        if (envelope.type === "error" && envelope.id && this.pending.has(envelope.id)) {
+          const pending = this.pending.get(envelope.id)!;
+          window.clearTimeout(pending.timer);
+          this.pending.delete(envelope.id);
+          const message = envelope.data?.error || "信令请求失败";
+          pending.reject(new Error(message));
+          return;
+        }
+
         this.options.onMessage?.(envelope);
       } catch {
         this.options.onError?.("WebSocket 消息解析失败");

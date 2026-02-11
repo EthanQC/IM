@@ -11,6 +11,22 @@ import type {
 } from "../types/im";
 import { normalizeApiMessage } from "../utils/message";
 
+function toUploadTransportURL(uploadURL: string): string {
+  if (!import.meta.env.DEV) {
+    return uploadURL;
+  }
+
+  try {
+    const parsed = new URL(uploadURL);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return `/__im_upload_proxy__?target=${encodeURIComponent(parsed.toString())}`;
+    }
+    return uploadURL;
+  } catch {
+    return uploadURL;
+  }
+}
+
 export async function apiRegister(input: {
   username: string;
   password: string;
@@ -141,7 +157,8 @@ export async function apiCreateUpload(input: {
 }
 
 export async function apiPutFile(uploadURL: string, file: File): Promise<void> {
-  const result = await fetch(uploadURL, {
+  const target = toUploadTransportURL(uploadURL);
+  const result = await fetch(target, {
     method: "PUT",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
@@ -150,6 +167,9 @@ export async function apiPutFile(uploadURL: string, file: File): Promise<void> {
   });
 
   if (!result.ok) {
+    if (result.status === 403) {
+      throw new Error("文件上传签名失效，请重试");
+    }
     throw new Error(`文件上传失败: ${result.status}`);
   }
 }

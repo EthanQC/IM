@@ -21,10 +21,10 @@ var (
 )
 
 type ContactUseCaseImpl struct {
-	contactRepo      out.ContactRepository
-	applyRepo        out.ContactApplyRepository
-	blacklistRepo    out.BlacklistRepository
-	userRepo         out.UserRepository
+	contactRepo   out.ContactRepository
+	applyRepo     out.ContactApplyRepository
+	blacklistRepo out.BlacklistRepository
+	userRepo      out.UserRepository
 }
 
 var _ in.ContactUseCase = (*ContactUseCaseImpl)(nil)
@@ -86,7 +86,28 @@ func (uc *ContactUseCaseImpl) ApplyContact(ctx context.Context, fromUserID, toUs
 		return fmt.Errorf("get pending apply: %w", err)
 	}
 	if pending != nil {
-		return ErrApplyAlreadyExists
+		// 相同方向重复申请按幂等处理，避免前端重复提交导致报错。
+		return nil
+	}
+
+	// 若对方已向当前用户发起申请，则自动互加联系人并将对方申请标记为已同意。
+	reversePending, err := uc.applyRepo.GetPendingApply(ctx, toUserID, fromUserID)
+	if err != nil {
+		return fmt.Errorf("get reverse pending apply: %w", err)
+	}
+	if reversePending != nil {
+		reversePending.Accept()
+		if err := uc.applyRepo.Update(ctx, reversePending); err != nil {
+			return fmt.Errorf("update reverse apply: %w", err)
+		}
+
+		if err := uc.ensureContact(ctx, fromUserID, toUserID); err != nil {
+			return fmt.Errorf("create contact for sender: %w", err)
+		}
+		if err := uc.ensureContact(ctx, toUserID, fromUserID); err != nil {
+			return fmt.Errorf("create contact for receiver: %w", err)
+		}
+		return nil
 	}
 
 	apply := &entity.ContactApply{
@@ -141,10 +162,10 @@ func (uc *ContactUseCaseImpl) ensureContact(ctx context.Context, userID, friendI
 	}
 	if contact == nil {
 		contact = &entity.Contact{
-			UserID:   userID,
-			FriendID: friendID,
-			Status:   entity.ContactStatusNormal,
-			Type:     entity.ContactTypeFriend,
+			UserID:    userID,
+			FriendID:  friendID,
+			Status:    entity.ContactStatusNormal,
+			Type:      entity.ContactTypeFriend,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
