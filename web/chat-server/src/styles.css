@@ -1,16 +1,17 @@
 :root {
   color-scheme: light;
-  --bg: #f2f2f2;
-  --bg-soft: #ebebeb;
+  --bg: #fef7f9;
+  --bg-soft: #fdf0f4;
   --surface: #ffffffee;
   --surface-strong: #ffffff;
-  --text: #1f1f1f;
-  --text-soft: #6f6f6f;
-  --border: #d9d9d9;
-  --primary: #07c160;
-  --primary-strong: #06ad56;
+  --text: #2d1f24;
+  --text-soft: #8c6b77;
+  --border: #f0d4dc;
+  --primary: #d4507a;
+  --primary-strong: #c03d68;
+  --primary-soft: #fbe8ef;
   --danger: #d94a45;
-  --shadow: 0 14px 36px -24px rgba(0, 0, 0, 0.24);
+  --shadow: 0 14px 36px -24px rgba(180, 60, 100, 0.18);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
@@ -26,9 +27,11 @@ body,
   width: 100%;
   min-height: 100%;
   margin: 0;
-  font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
   color: var(--text);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,

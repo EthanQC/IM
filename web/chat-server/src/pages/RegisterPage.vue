@@ -56,9 +56,9 @@ async function submit(): Promise<void> {
   <main class="auth-page">
     <section class="auth-card register-card">
       <header class="auth-header">
-        <p class="auth-kicker">IM</p>
+        <div class="auth-logo">IM</div>
         <h1>创建账号</h1>
-        <p class="auth-subtitle">注册后可直接进入会话、联系人与实时通话</p>
+        <p class="auth-subtitle">注册后即刻开始聊天、通话与文件分享</p>
       </header>
 
       <form class="auth-form" @submit.prevent="submit">
@@ -104,29 +104,41 @@ async function submit(): Promise<void> {
 
 <style scoped>
 .register-card {
-  width: min(520px, 96vw);
+  width: min(480px, 96vw);
 }
 
 .auth-header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
-.auth-kicker {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--primary-strong);
+.auth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f472b6, #d4507a);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 20px -4px rgba(212, 80, 122, 0.35);
 }
 
 h1 {
-  margin: 8px 0 6px;
-  font-size: 34px;
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .auth-subtitle {
   margin: 0;
   color: var(--text-soft);
+  font-size: 14px;
 }
 
 .auth-form {
@@ -136,26 +148,34 @@ h1 {
 
 label {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 label span {
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-soft);
 }
 
 input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 11px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   background: var(--surface-strong);
   color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 input:focus {
-  outline: 2px solid rgba(7, 193, 96, 0.35);
-  outline-offset: 1px;
+  outline: none;
+  border-color: #e88aab;
+  box-shadow: 0 0 0 3px rgba(212, 80, 122, 0.1);
+}
+
+input::placeholder {
+  color: #c4a3ae;
 }
 
 .auth-submit {
@@ -163,32 +183,53 @@ input:focus {
   height: 44px;
   border-radius: var(--radius-sm);
   border: none;
-  background: linear-gradient(120deg, #15c86b, #08b75b);
+  background: linear-gradient(135deg, #f472b6, #d4507a);
   color: #fff;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  box-shadow: 0 4px 14px -2px rgba(212, 80, 122, 0.3);
+}
+
+.auth-submit:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.auth-submit:active:not(:disabled) {
+  transform: scale(0.99);
 }
 
 .auth-submit:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .auth-error {
   margin: 0;
-  color: var(--danger);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   font-size: 13px;
 }
 
 .auth-footer {
-  margin-top: 18px;
+  margin-top: 20px;
+  text-align: center;
   color: var(--text-soft);
   font-size: 14px;
 }
 
 .auth-footer a {
-  color: var(--primary-strong);
+  color: var(--primary);
   font-weight: 600;
   text-decoration: none;
+  transition: color 0.15s;
+}
+
+.auth-footer a:hover {
+  color: var(--primary-strong);
 }
 </style>
